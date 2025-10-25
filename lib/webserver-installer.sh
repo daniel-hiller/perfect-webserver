@@ -46,6 +46,9 @@ install_nginx() {
     # Create security snippets
     create_nginx_security_snippets
 
+    # Install custom error pages
+    install_error_pages
+
     # Test configuration
     nginx -t || error_exit "Nginx configuration test failed"
 
@@ -178,6 +181,11 @@ server {
 
     server_name _;
 
+    # Custom error pages
+    error_page 403 /errors/403.html;
+    error_page 404 /errors/404.html;
+    error_page 500 502 503 504 /errors/50x.html;
+
     # Security headers
     include snippets/security-headers.conf;
 
@@ -188,6 +196,12 @@ server {
     # Main location
     location / {
         try_files \$uri \$uri/ =404;
+    }
+
+    # Error pages location
+    location ^~ /errors/ {
+        internal;
+        root /var/www;
     }
 
     # PHP processing
@@ -248,6 +262,49 @@ EOF
 }
 
 # ============================================================================
+# ERROR PAGES
+# ============================================================================
+
+# install_error_pages: Install custom error pages
+install_error_pages() {
+    log "Installing custom error pages..."
+
+    local error_dir="/var/www/errors"
+    local template_dir="${SCRIPT_DIR}/../config/templates"
+
+    # Create error pages directory
+    mkdir -p "${error_dir}"
+
+    # Copy error page templates
+    local error_files=("403" "404" "500" "502" "503")
+    
+    for error_code in "${error_files[@]}"; do
+        local template_file="${template_dir}/error-${error_code}.html"
+        local dest_file="${error_dir}/${error_code}.html"
+        
+        if [[ -f "${template_file}" ]]; then
+            cp "${template_file}" "${dest_file}"
+            log "Installed error page: ${error_code}.html"
+        else
+            log "Warning: Template not found: ${template_file}"
+        fi
+    done
+
+    # Create generic 50x.html that redirects to 500.html
+    if [[ -f "${error_dir}/500.html" ]]; then
+        cp "${error_dir}/500.html" "${error_dir}/50x.html"
+        log "Created generic 50x.html error page"
+    fi
+
+    # Set permissions
+    chown -R www-data:www-data "${error_dir}"
+    chmod 755 "${error_dir}"
+    chmod 644 "${error_dir}"/*.html
+
+    log "Custom error pages installed in ${error_dir}"
+}
+
+# ============================================================================
 # APACHE INSTALLATION
 # ============================================================================
 
@@ -282,6 +339,9 @@ install_apache() {
 
     # Create default virtual host
     create_apache_default_vhost
+
+    # Install custom error pages
+    install_error_pages
 
     # Disable default SSL site (if present)
     [[ -f /etc/apache2/sites-enabled/default-ssl.conf ]] && a2dissite default-ssl
@@ -390,6 +450,17 @@ create_apache_default_vhost() {
         Require all granted
     </Directory>
 
+    # Custom error pages
+    ErrorDocument 403 /errors/403.html
+    ErrorDocument 404 /errors/404.html
+    ErrorDocument 500 /errors/500.html
+    ErrorDocument 502 /errors/502.html
+    ErrorDocument 503 /errors/503.html
+
+    <Directory /var/www/errors>
+        Require all granted
+    </Directory>
+
     # Security headers
     Header always set X-Frame-Options "SAMEORIGIN"
     Header always set X-Content-Type-Options "nosniff"
@@ -477,95 +548,188 @@ test_webserver_config() {
 # DEFAULT WEB CONTENT
 # ============================================================================
 
-# create_default_index_page: Create default index.php and index.html
+# get_installation_info: Gather information about installed components
+get_installation_info() {
+    local info_type="$1"
+    
+    case "${info_type}" in
+        "components")
+            local components=""
+            
+            # Webserver
+            if [[ "${WEBSERVER}" == "nginx" ]]; then
+                components+='<div class="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border-l-4 border-purple-600 hover:scale-105"><div class="flex items-center gap-3 mb-2"><span class="text-3xl">🚀</span><span class="text-lg font-bold text-gray-800">Nginx</span></div><div class="text-gray-600 text-sm">High-performance web server</div></div>'
+            elif [[ "${WEBSERVER}" == "apache" ]]; then
+                components+='<div class="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border-l-4 border-purple-600 hover:scale-105"><div class="flex items-center gap-3 mb-2"><span class="text-3xl">🚀</span><span class="text-lg font-bold text-gray-800">Apache</span></div><div class="text-gray-600 text-sm">Reliable web server</div></div>'
+            fi
+            
+            # PHP
+            if [[ ${#PHP_VERSIONS[@]} -gt 0 ]]; then
+                components+='<div class="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border-l-4 border-indigo-600 hover:scale-105"><div class="flex items-center gap-3 mb-2"><span class="text-3xl">🐘</span><span class="text-lg font-bold text-gray-800">PHP-FPM</span></div><div class="text-gray-600 text-sm">FastCGI Process Manager</div></div>'
+            fi
+            
+            # Database
+            if command -v mysql &> /dev/null; then
+                components+='<div class="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border-l-4 border-blue-600 hover:scale-105"><div class="flex items-center gap-3 mb-2"><span class="text-3xl">🗄️</span><span class="text-lg font-bold text-gray-800">MariaDB</span></div><div class="text-gray-600 text-sm">Database server</div></div>'
+            fi
+            
+            # Certbot
+            if command -v certbot &> /dev/null; then
+                components+='<div class="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border-l-4 border-green-600 hover:scale-105"><div class="flex items-center gap-3 mb-2"><span class="text-3xl">🔒</span><span class="text-lg font-bold text-gray-800">Certbot</span></div><div class="text-gray-600 text-sm">SSL certificate management</div></div>'
+            fi
+            
+            # UFW
+            if command -v ufw &> /dev/null; then
+                components+='<div class="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border-l-4 border-red-600 hover:scale-105"><div class="flex items-center gap-3 mb-2"><span class="text-3xl">🔥</span><span class="text-lg font-bold text-gray-800">UFW Firewall</span></div><div class="text-gray-600 text-sm">Security configured</div></div>'
+            fi
+            
+            echo "${components}"
+            ;;
+            
+        "php_versions")
+            local versions=""
+            for version in "${PHP_VERSIONS[@]}"; do
+                versions+="<span class=\"inline-block bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg hover:shadow-xl transition-shadow duration-200\">PHP ${version}</span>"
+            done
+            echo "${versions}"
+            ;;
+            
+        "default_php")
+            if [[ ${#PHP_VERSIONS[@]} -gt 0 ]]; then
+                echo "${PHP_VERSIONS[-1]}"
+            else
+                echo "N/A"
+            fi
+            ;;
+            
+        "mariadb_info")
+            if command -v mysql &> /dev/null; then
+                local pw_file="/root/.webhosting-credentials"
+                echo '<div class="mb-10"><h2 class="text-3xl font-bold text-gray-800 mb-6 flex items-center"><svg class="w-8 h-8 mr-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>Database Credentials</h2><div class="bg-gradient-to-r from-red-50 to-pink-50 border-l-4 border-red-500 rounded-xl p-6"><div class="flex items-start"><svg class="w-6 h-6 text-red-500 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg><div><h3 class="text-lg font-bold text-red-800 mb-3">Important: Database Passwords</h3><p class="text-gray-700 mb-4">Your MariaDB root password and other database credentials have been saved to:</p><div class="bg-gray-800 text-green-400 px-4 py-3 rounded-lg font-mono text-sm mb-4">/root/.webhosting-credentials</div><div class="bg-white border border-red-200 rounded-lg p-4 mb-4"><p class="text-sm text-gray-700"><strong class="text-red-700">⚠️ Security:</strong> This file contains sensitive information and is only readable by root. Please store these credentials in a secure password manager and consider removing this file after noting the passwords.</p></div><p class="text-gray-700"><strong>Access MariaDB:</strong> <code class="bg-gray-800 text-green-400 px-2 py-1 rounded text-sm">mysql -u root -p</code></p></div></div></div></div>'
+            else
+                echo ""
+            fi
+            ;;
+            
+        "webserver_config")
+            if [[ "${WEBSERVER}" == "nginx" ]]; then
+                echo "/etc/nginx/nginx.conf"
+            elif [[ "${WEBSERVER}" == "apache" ]]; then
+                echo "/etc/apache2/apache2.conf"
+            else
+                echo "N/A"
+            fi
+            ;;
+            
+        "database_config")
+            if command -v mysql &> /dev/null; then
+                echo '<div class="mt-4"><p class="font-semibold text-gray-700 mb-2">Database Config:</p><div class="bg-gray-800 text-green-400 px-4 py-3 rounded-lg font-mono text-sm">/etc/mysql/mariadb.conf.d/</div></div>'
+            else
+                echo ""
+            fi
+            ;;
+            
+        "component_count")
+            local count=0
+            [[ "${WEBSERVER}" == "nginx" || "${WEBSERVER}" == "apache" ]] && ((count++))
+            [[ ${#PHP_VERSIONS[@]} -gt 0 ]] && ((count++))
+            command -v mysql &> /dev/null && ((count++))
+            command -v certbot &> /dev/null && ((count++))
+            command -v ufw &> /dev/null && ((count++))
+            echo "${count}"
+            ;;
+            
+        "php_count")
+            echo "${#PHP_VERSIONS[@]}"
+            ;;
+            
+        "webserver_name")
+            if [[ "${WEBSERVER}" == "nginx" ]]; then
+                echo "Nginx"
+            elif [[ "${WEBSERVER}" == "apache" ]]; then
+                echo "Apache"
+            else
+                echo "N/A"
+            fi
+            ;;
+    esac
+}
+
+# create_default_index_page: Create default index.html from template
 create_default_index_page() {
     log "Creating default web pages..."
 
     local webroot="/var/www/html"
-
-    # Create index.html
-    cat > "${webroot}/index.html" << 'EOF'
-<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webserver erfolgreich installiert</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            line-height: 1.6;
-            max-width: 800px;
-            margin: 50px auto;
-            padding: 20px;
-            background: #f5f5f5;
-        }
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            border-bottom: 3px solid #4CAF50;
-            padding-bottom: 10px;
-        }
-        .success {
-            color: #4CAF50;
-            font-size: 1.2em;
-            font-weight: bold;
-        }
-        .info {
-            background: #e3f2fd;
-            padding: 15px;
-            border-left: 4px solid #2196F3;
-            margin: 20px 0;
-        }
-        code {
-            background: #f4f4f4;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-family: monospace;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Webserver Installation</h1>
-        <p class="success">✓ Webserver erfolgreich installiert!</p>
-
-        <div class="info">
-            <strong>Nächste Schritte:</strong>
-            <ol>
-                <li>Ersetzen Sie diese Seite durch Ihre eigene Website</li>
-                <li>Konfigurieren Sie Virtual Hosts für Ihre Domains</li>
-                <li>Installieren Sie ggf. SSL-Zertifikate mit Certbot</li>
-            </ol>
-        </div>
-
-        <p>
-            Diese Seite befindet sich in: <code>/var/www/html/</code><br>
-            Testen Sie PHP: <a href="info.php">info.php</a>
-        </p>
-    </div>
-</body>
-</html>
-EOF
+    local template_file="${SCRIPT_DIR}/../config/templates/default-index.html.template"
+    
+    # Check if template exists
+    if [[ ! -f "${template_file}" ]]; then
+        log "Warning: Template file not found: ${template_file}"
+        log "Creating basic index.html instead..."
+        echo "<h1>Web Server Installed</h1><p>Template file missing.</p>" > "${webroot}/index.html"
+    else
+        # Read template
+        local template_content
+        template_content=$(cat "${template_file}")
+        
+        # Gather installation information
+        local installed_components
+        installed_components=$(get_installation_info "components")
+        
+        local php_versions
+        php_versions=$(get_installation_info "php_versions")
+        
+        local default_php
+        default_php=$(get_installation_info "default_php")
+        
+        local mariadb_info
+        mariadb_info=$(get_installation_info "mariadb_info")
+        
+        local webserver_config
+        webserver_config=$(get_installation_info "webserver_config")
+        
+        local database_config
+        database_config=$(get_installation_info "database_config")
+        
+        local component_count
+        component_count=$(get_installation_info "component_count")
+        
+        local php_count
+        php_count=$(get_installation_info "php_count")
+        
+        local webserver_name
+        webserver_name=$(get_installation_info "webserver_name")
+        
+        # Substitute placeholders
+        template_content="${template_content//\{\{INSTALLED_COMPONENTS\}\}/${installed_components}}"
+        template_content="${template_content//\{\{PHP_VERSIONS\}\}/${php_versions}}"
+        template_content="${template_content//\{\{DEFAULT_PHP_VERSION\}\}/${default_php}}"
+        template_content="${template_content//\{\{MARIADB_INFO\}\}/${mariadb_info}}"
+        template_content="${template_content//\{\{WEBSERVER_CONFIG\}\}/${webserver_config}}"
+        template_content="${template_content//\{\{DATABASE_CONFIG\}\}/${database_config}}"
+        template_content="${template_content//\{\{COMPONENT_COUNT\}\}/${component_count}}"
+        template_content="${template_content//\{\{PHP_COUNT\}\}/${php_count}}"
+        template_content="${template_content//\{\{WEBSERVER_NAME\}\}/${webserver_name}}"
+        
+        # Write final HTML
+        echo "${template_content}" > "${webroot}/index.html"
+    fi
 
     # Create info.php for PHP testing
     cat > "${webroot}/info.php" << 'EOF'
 <?php
 /**
  * PHP Information Page
- * Auto-generated by Webhosting Installer
+ * Auto-generated by Perfect Webserver Installer
  */
 
 // Security: Remove this file in production!
 if ($_SERVER['REMOTE_ADDR'] !== '127.0.0.1' &&
     $_SERVER['REMOTE_ADDR'] !== '::1') {
     // Only allow from localhost in production
-    // Comment out these lines to enable remote access
+    // Uncomment to enable remote access (not recommended):
+    // header('HTTP/1.0 403 Forbidden');
+    // exit('Access denied. Only localhost access allowed.');
 }
 
 phpinfo();

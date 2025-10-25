@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Successfully Installed</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#667eea',
+                        secondary: '#764ba2',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#667eea',
+                        secondary: '#764ba2',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        .animate-slide-in {
+            animation: slideInUp 0.6s ease-out;
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.8s ease-out;
+        }
+        
+        .animate-pulse-slow {
+            animation: pulse-slow 3s ease-in-out infinite;
+        }
+        
+        .gradient-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .gradient-card {
+            background: linear-gradient(135deg, #f6f8fb 0%, #e9ecef 100%);
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800">
+    
+    <!-- Animated Background Circles -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-pulse-slow"></div>
+        <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-pulse-slow" style="animation-delay: 1s;"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse-slow" style="animation-delay: 2s;"></div>
+    </div>
+
+    <div class="container mx-auto px-4 py-8 flex-1 relative z-10">
+        <!-- Main Card -->
+        <div class="max-w-5xl mx-auto glass-effect rounded-3xl shadow-2xl p-8 md:p-12 mb-8 animate-slide-in">
+            
+            <!-- Header -->
+            <div class="flex items-center gap-4 mb-8">
+                <div class="w-16 h-16 gradient-primary rounded-2xl flex items-center justify-center transform hover:scale-110 transition-transform duration-300">
+                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-4xl md:text-5xl font-bold text-gray-800">Web Server Installation</h1>
+                    <p class="text-gray-500 mt-1">Powered by Perfect Webserver Installer</p>
+                </div>
+            </div>
+            
+            <!-- Success Message -->
+            <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 rounded-xl p-6 mb-8 animate-fade-in">
+                <div class="flex items-center">
+                    <svg class="w-8 h-8 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span class="text-xl font-semibold text-green-800">Server successfully installed and configured!</span>
+                </div>
+            </div>
+
+            <!-- System Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                <div class="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-100">
+                    <div class="text-center">
+                        <div class="text-4xl font-bold gradient-primary bg-clip-text text-transparent">{{COMPONENT_COUNT}}</div>
+                        <div class="text-gray-600 mt-2 font-medium">Components</div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-100">
+                    <div class="text-center">
+                        <div class="text-4xl font-bold gradient-primary bg-clip-text text-transparent">{{PHP_COUNT}}</div>
+                        <div class="text-gray-600 mt-2 font-medium">PHP Versions</div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-100">
+                    <div class="text-center">
+                        <div class="text-4xl font-bold gradient-primary bg-clip-text text-transparent">{{WEBSERVER_NAME}}</div>
+                        <div class="text-gray-600 mt-2 font-medium">Web Server</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Installed Components -->
+            <div class="mb-10">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6 flex items-center">
+                    <svg class="w-8 h-8 mr-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                    </svg>
+                    Installed Components
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {{INSTALLED_COMPONENTS}}
+                </div>
+            </div>
+
+            <!-- PHP Configuration -->
+            <div class="mb-10">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6 flex items-center">
+                    <svg class="w-8 h-8 mr-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                    </svg>
+                    PHP Configuration
+                </h2>
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-200">
+                    <p class="font-semibold text-gray-700 mb-4">Installed PHP Versions:</p>
+                    <div class="flex flex-wrap gap-3 mb-6">
+                        {{PHP_VERSIONS}}
+                    </div>
+                    <div class="flex items-center justify-between flex-wrap gap-4">
+                        <div>
+                            <span class="font-semibold text-gray-700">Default PHP Version:</span>
+                            <span class="ml-2 inline-block gradient-primary text-white px-4 py-1 rounded-full text-sm font-bold">{{DEFAULT_PHP_VERSION}}</span>
+                        </div>
+                        <a href="info.php" class="inline-flex items-center px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors duration-200">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Test PHP Info
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            {{MARIADB_INFO}}
+
+            <!-- Next Steps -->
+            <div class="mb-10">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6 flex items-center">
+                    <svg class="w-8 h-8 mr-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                    </svg>
+                    Next Steps
+                </h2>
+                <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200">
+                    <ol class="space-y-3 list-decimal list-inside text-gray-700">
+                        <li class="pl-2">Replace this page with your own website content</li>
+                        <li class="pl-2">Configure Virtual Hosts for your domains</li>
+                        <li class="pl-2">Install SSL certificates using Certbot</li>
+                        <li class="pl-2">Set up your database and applications</li>
+                        <li class="pl-2">Configure backups for your data</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- Important Locations -->
+            <div class="mb-10">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6 flex items-center">
+                    <svg class="w-8 h-8 mr-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                    </svg>
+                    Important Locations
+                </h2>
+                <div class="space-y-4">
+                    <div>
+                        <p class="font-semibold text-gray-700 mb-2">Web Root:</p>
+                        <div class="bg-gray-800 text-green-400 px-4 py-3 rounded-lg font-mono text-sm">/var/www/html/</div>
+                    </div>
+                    <div>
+                        <p class="font-semibold text-gray-700 mb-2">Configuration Files:</p>
+                        <div class="bg-gray-800 text-green-400 px-4 py-3 rounded-lg font-mono text-sm">{{WEBSERVER_CONFIG}}</div>
+                    </div>
+                    {{DATABASE_CONFIG}}
+                </div>
+            </div>
+
+            <!-- Security Notice -->
+            <div class="bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-orange-500 rounded-xl p-6">
+                <div class="flex items-start">
+                    <svg class="w-6 h-6 text-orange-500 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <div>
+                        <h3 class="text-lg font-bold text-orange-800 mb-3">Security Notice</h3>
+                        <p class="text-gray-700 mb-2">Don't forget to:</p>
+                        <ul class="space-y-2 text-gray-700">
+                            <li class="flex items-start">
+                                <span class="text-orange-500 mr-2">•</span>
+                                <span>Remove or protect <code class="bg-gray-800 text-green-400 px-2 py-0.5 rounded text-sm">info.php</code> in production</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-orange-500 mr-2">•</span>
+                                <span>Configure firewall rules (UFW is pre-configured)</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-orange-500 mr-2">•</span>
+                                <span>Keep your system and packages updated</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-orange-500 mr-2">•</span>
+                                <span>Use strong passwords for all services</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="text-orange-500 mr-2">•</span>
+                                <span>Enable automatic security updates</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="relative z-10 bg-gray-900 text-white py-8 mt-auto">
+        <div class="container mx-auto px-4">
+            <div class="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="text-center md:text-left">
+                    <p class="text-gray-300">
+                        &copy; 2025 Perfect Webserver Installer
+                    </p>
+                    <p class="text-sm text-gray-400 mt-1">
+                        Licensed under AGPL-3.0
+                    </p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <a href="https://github.com/daniel-hiller/perfect-webserver" 
+                       target="_blank" 
+                       class="inline-flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-5 py-3 rounded-lg transition-colors duration-200 group">
+                        <svg class="w-5 h-5 group-hover:scale-110 transition-transform duration-200" fill="currentColor" viewBox="0 0 24 24">
+                            <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span class="font-medium">View on GitHub</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>

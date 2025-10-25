@@ -23,6 +23,21 @@ A fully automated, modular installer for production-ready webhosting environment
 - **Memory**: At least 1 GB RAM (2+ GB recommended)
 - **Disk Space**: At least 5 GB free disk space
 
+### LXC Container Requirements (Proxmox)
+
+If running in an LXC container, **unprivileged containers are strongly recommended**:
+
+```bash
+# On Proxmox host, configure container:
+pct set <CTID> -unprivileged 1 -features keyctl=1,nesting=1
+```
+
+**Important Notes:**
+- **Unprivileged containers** work out-of-the-box without modifications
+- **Privileged containers** require systemd overrides (applied automatically by installer)
+- Required features: `keyctl=1` and `nesting=1` for MariaDB and systemd compatibility
+- The installer detects container type and applies fixes automatically if needed
+
 ## 🔧 Installation
 
 ### Quick Start
@@ -189,6 +204,32 @@ perfect-webserver/
 
 ## 🛠️ Troubleshooting
 
+### LXC Container Issues (Proxmox)
+
+**MariaDB fails to start with status=226/NAMESPACE:**
+
+This typically occurs in **privileged** LXC containers. Solutions:
+
+1. **Recommended**: Use unprivileged container (requires container recreation):
+   \`\`\`bash
+   # On Proxmox host:
+   pct set <CTID> -unprivileged 1 -features keyctl=1,nesting=1
+   \`\`\`
+
+2. **Alternative**: The installer applies systemd overrides automatically for privileged containers, but unprivileged is preferred.
+
+3. **Verify container type:**
+   \`\`\`bash
+   # Inside container:
+   cat /proc/self/uid_map
+   # "0 0 4294967295" = privileged
+   # "0 100000 65536" = unprivileged (recommended)
+   \`\`\`
+
+**Locale warnings during installation:**
+- Automatically fixed by installer via \`setup_locale()\` function
+- Generates \`en_US.UTF-8\` locale for LXC containers
+
 ### PHP-FPM Issues
 \`\`\`bash
 sudo systemctl status php8.3-fpm
@@ -208,6 +249,7 @@ sudo apache2ctl configtest && sudo systemctl status apache2
 ### MariaDB Issues
 \`\`\`bash
 sudo systemctl status mariadb
+sudo journalctl -u mariadb -n 50
 sudo tail -f /var/log/mysql/error.log
 \`\`\`
 

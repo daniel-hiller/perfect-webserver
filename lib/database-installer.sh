@@ -11,63 +11,103 @@
 # MARIADB INSTALLATION
 # ============================================================================
 
-# install_mariadb: Install MariaDB server and client
+# install_mariadb: Install MariaDB server and client from official repository
 install_mariadb() {
     log "Installing MariaDB server..."
 
-    # Install MariaDB packages
-    install_package "mariadb-server"
-    install_package "mariadb-client"
+    # Check for unprivileged container (recommended for LXC)
+    if grep -q 'container=lxc' /proc/1/environ 2>/dev/null; then
+        if [[ -f /proc/self/uid_map ]]; then
+            local uid_map
+            uid_map=$(cat /proc/self/uid_map)
+            if [[ "$uid_map" == "0 0 4294967295" ]]; then
+                log "WARNING: Running in PRIVILEGED LXC container"
+                log "WARNING: Unprivileged containers are recommended for better security"
+                log "WARNING: If MariaDB fails to start, consider using unprivileged container"
+                log "WARNING: Or ensure LXC features: keyctl=1,nesting=1 are enabled"
+            else
+                log "Unprivileged LXC container detected (recommended)"
+            fi
+        fi
+    fi
 
-    # Fix MariaDB for container environments (LXC/Docker)
-    log "Configuring MariaDB for container compatibility..."
+    # Install dependencies first
+    log "Installing MariaDB dependencies..."
+    local deps=("gawk" "rsync" "socat" "libdbi-perl" "pv")
+    for dep in "${deps[@]}"; do
+        install_package "$dep" || log "Warning: Failed to install $dep"
+    done
 
-    # Create runtime directory manually (sometimes missing in containers)
-    mkdir -p /var/run/mysqld
-    chown mysql:mysql /var/run/mysqld
-    chmod 755 /var/run/mysqld
+    # Add official MariaDB repository for latest version
+    log "Adding official MariaDB repository..."
 
-    # Create systemd override directory
-    mkdir -p /etc/systemd/system/mariadb.service.d/
+    # Get Debian codename
+    local codename
+    codename=$(lsb_release -sc)
 
-    # Create override configuration to disable problematic systemd features
-    cat > /etc/systemd/system/mariadb.service.d/container-override.conf << 'EOF'
-[Service]
-# Remove ExecStartPre that tries to use install with namespace features
-ExecStartPre=
+    # Download and install MariaDB GPG key
+    log "Adding MariaDB GPG key..."
+    wget -qO /tmp/mariadb-keyring.gpg https://mariadb.org/mariadb_release_signing_key.asc || {
+        error_exit "Failed to download MariaDB GPG key"
+    }
 
-# Ensure runtime directory exists
-RuntimeDirectory=mysqld
-RuntimeDirectoryMode=0755
+    gpg --dearmor < /tmp/mariadb-keyring.gpg > /usr/share/keyrings/mariadb-keyring.gpg 2>/dev/null
+    rm -f /tmp/mariadb-keyring.gpg
 
-# Disable systemd hardening features that may not work in containers
-PrivateNetwork=no
-PrivateTmp=no
-ProtectHome=no
-ProtectSystem=no
-PrivateDevices=no
-NoNewPrivileges=no
-ProtectKernelTunables=no
-ProtectKernelModules=no
-ProtectControlGroups=no
-RestrictRealtime=no
-RestrictNamespaces=no
-RestrictAddressFamilies=no
-LockPersonality=no
-MemoryDenyWriteExecute=no
-RestrictSUIDSGID=no
+    # Determine latest stable MariaDB version
+    local mariadb_version="11.8"  # LTS version
+    log "Using MariaDB version: ${mariadb_version}"
+
+    # Add MariaDB repository
+    cat > /etc/apt/sources.list.d/mariadb.list << EOF
+# MariaDB ${mariadb_version} repository
+deb [signed-by=/usr/share/keyrings/mariadb-keyring.gpg] http://mirror.mariadb.org/repo/${mariadb_version}/debian ${codename} main
 EOF
 
-    log "MariaDB systemd overrides created for container compatibility"
+    # Set debconf to disable feedback plugin
+    echo "mariadb-server-${mariadb_version} mariadb-server/feedback boolean false" | debconf-set-selections
 
-    # Reload systemd to apply changes
-    systemctl daemon-reload
+    # Update package lists
+    log "Updating package lists with MariaDB repository..."
+    apt-get update -qq || error_exit "Failed to update package lists"
+
+    # Install MariaDB packages
+    log "Installing MariaDB ${mariadb_version} packages..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq mariadb-server mariadb-client || {
+        error_exit "Failed to install MariaDB packages"
+    }
+
+    # Check if running in privileged container - apply fixes if needed
+    if grep -q 'container=lxc' /proc/1/environ 2>/dev/null; then
+        local uid_map
+        uid_map=$(cat /proc/self/uid_map 2>/dev/null)
+        if [[ "$uid_map" == "0 0 4294967295" ]]; then
+            log "Privileged container detected, applying compatibility fixes..."
+
+            mkdir -p /etc/systemd/system/mariadb.service.d/
+
+            cat > /etc/systemd/system/mariadb.service.d/lxc-privileged.conf << 'EOF'
+[Service]
+# Fix for privileged LXC containers
+# Replace ExecStartPre with + prefix that fails with NAMESPACE error
+ExecStartPre=
+ExecStartPre=/bin/sh -c 'mkdir -p /run/mysqld && chown mysql:mysql /run/mysqld && chmod 755 /run/mysqld'
+ExecStartPre=/bin/sh -c "[ ! -e /usr/bin/galera_recovery ] && VAR= || VAR=\`/usr/bin/galera_recovery\`; [ \$? -eq 0 ] && echo _WSREP_START_POSITION=\$VAR > /run/mysqld/wsrep-start-position || exit 1"
+
+PrivateTmp=no
+ProtectSystem=no
+EOF
+
+            log "Applied fixes for privileged LXC container"
+            systemctl daemon-reload
+        fi
+    fi
 
     # Enable and start MariaDB
     log "Enabling and starting MariaDB service..."
     systemctl enable mariadb || log "Warning: Failed to enable MariaDB service"
 
-    # Start MariaDB (with retry for LXC containers)
+    # Start MariaDB with retry logic
     local start_attempts=3
     local attempt=0
     local service_started=false
@@ -89,6 +129,15 @@ EOF
         log "ERROR: Failed to start MariaDB after ${start_attempts} attempts"
         log "Checking MariaDB logs..."
         journalctl -u mariadb -n 50 --no-pager | tee -a "${LOG_FILE}" || true
+
+        # Additional debug info for containers
+        if grep -q 'container=' /proc/1/environ 2>/dev/null; then
+            log "Container detected. Please ensure LXC features are enabled:"
+            log "  - unprivileged: 1 (recommended)"
+            log "  - features: keyctl=1,nesting=1"
+            log "Run on Proxmox host: pct set <CTID> -unprivileged 1 -features keyctl=1,nesting=1"
+        fi
+
         error_exit "MariaDB service failed to start. Check logs for details."
     fi
 
@@ -111,9 +160,9 @@ EOF
     log "MariaDB is ready"
 
     # Verify installation
-    local mariadb_version
-    mariadb_version=$(mysql --version | awk '{print $5}' | sed 's/,//')
-    log "MariaDB version: ${mariadb_version}"
+    local mariadb_version_installed
+    mariadb_version_installed=$(mysql --version | awk '{print $5}' | sed 's/,//')
+    log "MariaDB version: ${mariadb_version_installed}"
 
     log "MariaDB installation completed successfully"
 }
@@ -256,303 +305,6 @@ grant_privileges() {
     }
 
     log "Privileges granted successfully"
-}
-
-# ============================================================================
-# MARIADB CONFIGURATION
-# ============================================================================
-
-# optimize_mariadb_config: Optimize MariaDB configuration based on system resources
-optimize_mariadb_config() {
-    log "Optimizing MariaDB configuration..."
-
-    local config_file="/etc/mysql/mariadb.conf.d/99-webhosting-optimization.cnf"
-
-    # Get system resources
-    local total_memory
-    total_memory=$(get_total_memory)
-
-    # Calculate buffer pool size (50% of RAM for systems with >= 2GB, 25% for smaller)
-    local innodb_buffer_pool_size
-    if [[ ${total_memory} -ge 2048 ]]; then
-        innodb_buffer_pool_size=$((total_memory / 2))
-    else
-        innodb_buffer_pool_size=$((total_memory / 4))
-    fi
-
-    # Ensure minimum size
-    [[ ${innodb_buffer_pool_size} -lt 128 ]] && innodb_buffer_pool_size=128
-
-    log "Calculated InnoDB buffer pool size: ${innodb_buffer_pool_size}M"
-
-    # Create optimization config
-    cat > "${config_file}" << EOF
-# MariaDB Optimization Configuration
-# Auto-generated by Webhosting Installer
-# System Memory: ${total_memory}M
-
-[mysqld]
-
-# InnoDB Settings
-innodb_buffer_pool_size = ${innodb_buffer_pool_size}M
-innodb_log_file_size = 64M
-innodb_flush_log_at_trx_commit = 2
-innodb_file_per_table = 1
-
-# Query Cache (disabled in MariaDB 10.5+)
-# query_cache_type = 0
-# query_cache_size = 0
-
-# Connection Settings
-max_connections = 150
-max_allowed_packet = 64M
-
-# Logging
-log_error = /var/log/mysql/error.log
-slow_query_log = 1
-slow_query_log_file = /var/log/mysql/slow-query.log
-long_query_time = 2
-
-# Character Set
-character-set-server = utf8mb4
-collation-server = utf8mb4_unicode_ci
-
-# Performance Schema (disable for lower memory usage)
-performance_schema = OFF
-EOF
-
-    # Restart MariaDB to apply changes
-    log "Restarting MariaDB to apply optimizations..."
-    restart_service "mariadb"
-
-    log "MariaDB optimization completed"
-}
-
-# ============================================================================
-# BACKUP AND MAINTENANCE
-# ============================================================================
-
-# create_backup_script: Create automated backup script
-create_backup_script() {
-    log "Creating database backup script..."
-
-    local backup_script="/usr/local/bin/mysql-backup.sh"
-    local backup_dir="/var/backups/mysql"
-
-    # Create backup directory
-    mkdir -p "${backup_dir}"
-    chmod 700 "${backup_dir}"
-
-    # Create backup script
-    cat > "${backup_script}" << 'EOF'
-#!/bin/bash
-#
-# MySQL/MariaDB Backup Script
-# Auto-generated by Webhosting Installer
-#
-
-BACKUP_DIR="/var/backups/mysql"
-RETENTION_DAYS=7
-DATE=$(date +%Y%m%d-%H%M%S)
-
-# Create backup directory
-mkdir -p "${BACKUP_DIR}"
-
-# Get all databases
-DATABASES=$(mysql -sNe "SHOW DATABASES" | grep -Ev '^(information_schema|performance_schema|mysql|sys)$')
-
-# Backup each database
-for db in ${DATABASES}; do
-    BACKUP_FILE="${BACKUP_DIR}/${db}-${DATE}.sql.gz"
-    echo "Backing up database: ${db}"
-    mysqldump --single-transaction --routines --triggers "${db}" | gzip > "${BACKUP_FILE}"
-
-    if [[ $? -eq 0 ]]; then
-        echo "Backup created: ${BACKUP_FILE}"
-    else
-        echo "ERROR: Backup failed for database: ${db}"
-    fi
-done
-
-# Remove old backups
-find "${BACKUP_DIR}" -name "*.sql.gz" -mtime +${RETENTION_DAYS} -delete
-echo "Old backups removed (older than ${RETENTION_DAYS} days)"
-
-echo "Backup completed: $(date)"
-EOF
-
-    chmod 755 "${backup_script}"
-
-    log "Backup script created: ${backup_script}"
-    log "Usage: ${backup_script}"
-}
-
-# ============================================================================
-# DATABASE UTILITIES
-# ============================================================================
-
-# test_database_connection: Test database connection
-test_database_connection() {
-    log "Testing database connection..."
-
-    if ! mysqladmin ping --silent; then
-        error_exit "Database connection test failed"
-    fi
-
-    log "Database connection test successful"
-}
-
-# list_databases: List all databases
-list_databases() {
-    log "Listing databases..."
-    mysql -sNe "SHOW DATABASES"
-}
-
-# list_users: List all users
-list_users() {
-    log "Listing users..."
-    mysql -sNe "SELECT User, Host FROM mysql.user ORDER BY User"
-}
-
-# get_database_size: Get size of specific database
-# Usage: get_database_size "database_name"
-get_database_size() {
-    local db_name="$1"
-
-    if [[ -z "${db_name}" ]]; then
-        error_exit "Database name not specified"
-    fi
-
-    mysql -sNe "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'Size (MB)'
-                FROM information_schema.TABLES
-                WHERE table_schema = '${db_name}'"
-}
-
-# ============================================================================
-# USER MANAGEMENT
-# ============================================================================
-
-# create_additional_user: Create additional database user with specific privileges
-# Usage: create_additional_user "username" "password" "database" "privileges"
-create_additional_user() {
-    local username="$1"
-    local password="$2"
-    local database="$3"
-    local privileges="${4:-ALL PRIVILEGES}"
-
-    log "Creating user: ${username} with ${privileges} on ${database}"
-
-    # Validate inputs
-    if [[ -z "${username}" ]] || [[ -z "${password}" ]] || [[ -z "${database}" ]]; then
-        error_exit "Missing parameters for user creation"
-    fi
-
-    # Create user if not exists
-    mysql -e "CREATE USER IF NOT EXISTS '${username}'@'localhost' IDENTIFIED BY '${password}';" || {
-        error_exit "Failed to create user: ${username}"
-    }
-
-    # Grant privileges
-    mysql -e "GRANT ${privileges} ON \`${database}\`.* TO '${username}'@'localhost';" || {
-        error_exit "Failed to grant privileges to ${username}"
-    }
-
-    # Flush privileges
-    mysql -e "FLUSH PRIVILEGES;" || {
-        error_exit "Failed to flush privileges"
-    }
-
-    log "User created and privileges granted: ${username}"
-}
-
-# delete_user: Delete database user
-# Usage: delete_user "username"
-delete_user() {
-    local username="$1"
-
-    if [[ -z "${username}" ]]; then
-        error_exit "Username not specified"
-    fi
-
-    log "Deleting user: ${username}"
-
-    mysql -e "DROP USER IF EXISTS '${username}'@'localhost';" || {
-        error_exit "Failed to delete user: ${username}"
-    }
-
-    mysql -e "FLUSH PRIVILEGES;"
-
-    log "User deleted: ${username}"
-}
-
-# ============================================================================
-# DATABASE OPERATIONS
-# ============================================================================
-
-# import_database: Import SQL file into database
-# Usage: import_database "database_name" "/path/to/file.sql"
-import_database() {
-    local db_name="$1"
-    local sql_file="$2"
-
-    if [[ -z "${db_name}" ]] || [[ -z "${sql_file}" ]]; then
-        error_exit "Missing parameters for database import"
-    fi
-
-    if [[ ! -f "${sql_file}" ]]; then
-        error_exit "SQL file not found: ${sql_file}"
-    fi
-
-    log "Importing ${sql_file} into ${db_name}..."
-
-    mysql "${db_name}" < "${sql_file}" || {
-        error_exit "Failed to import database from ${sql_file}"
-    }
-
-    log "Database import completed"
-}
-
-# export_database: Export database to SQL file
-# Usage: export_database "database_name" "/path/to/output.sql"
-export_database() {
-    local db_name="$1"
-    local output_file="$2"
-
-    if [[ -z "${db_name}" ]] || [[ -z "${output_file}" ]]; then
-        error_exit "Missing parameters for database export"
-    fi
-
-    log "Exporting ${db_name} to ${output_file}..."
-
-    mysqldump --single-transaction --routines --triggers "${db_name}" > "${output_file}" || {
-        error_exit "Failed to export database to ${output_file}"
-    }
-
-    log "Database export completed: ${output_file}"
-}
-
-# ============================================================================
-# MONITORING
-# ============================================================================
-
-# show_mariadb_status: Display MariaDB status information
-show_mariadb_status() {
-    log "MariaDB Status:"
-    echo "==============================================="
-
-    echo -e "\nVersion:"
-    mysql -sNe "SELECT VERSION()"
-
-    echo -e "\nUptime:"
-    mysql -sNe "SHOW GLOBAL STATUS LIKE 'Uptime'" | awk '{print $2}'
-
-    echo -e "\nConnections:"
-    mysql -sNe "SHOW GLOBAL STATUS LIKE 'Threads_connected'" | awk '{print $2}'
-
-    echo -e "\nDatabases:"
-    list_databases
-
-    echo "==============================================="
 }
 
 # ============================================================================

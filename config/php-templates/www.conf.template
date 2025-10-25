@@ -1,0 +1,115 @@
+; PHP-FPM Pool Configuration Template
+; Copy to /etc/php/X.X/fpm/pool.d/yourpool.conf
+; This is a reference template showing common optimizations
+
+[yourpool]
+
+; Pool user/group
+user = www-data
+group = www-data
+
+; Socket path
+listen = /run/php/phpX.X-yourpool.sock
+
+; Socket permissions
+listen.owner = www-data
+listen.group = www-data
+listen.mode = 0660
+
+; Process Management
+; Dynamic: pm.max_children, pm.start_servers, pm.min_spare_servers, pm.max_spare_servers
+; Static: pm.max_children
+; Ondemand: pm.max_children, pm.process_idle_timeout
+pm = dynamic
+
+; Maximum number of child processes
+; Calculate: (Total RAM - Other processes RAM) / Average PHP process size
+; Average PHP process: 30-50MB
+pm.max_children = 20
+
+; Number of child processes created on startup
+pm.start_servers = 5
+
+; Minimum number of spare (idle) child processes
+pm.min_spare_servers = 2
+
+; Maximum number of spare (idle) child processes
+pm.max_spare_servers = 10
+
+; Number of requests each child should execute before respawning
+; Useful to work around memory leaks
+pm.max_requests = 500
+
+; Process Manager status page
+; Access via: /fpm-status
+pm.status_path = /fpm-status
+
+; Ping page for monitoring
+; Access via: /fpm-ping
+ping.path = /fpm-ping
+ping.response = pong
+
+; Request timeout (should match max_execution_time in php.ini)
+request_terminate_timeout = 300
+
+; Request slowlog
+slowlog = /var/log/php/phpX.X-yourpool-slow.log
+request_slowlog_timeout = 5s
+
+; Process manager log level
+; alert, error, warning, notice, debug
+php_admin_value[error_log] = /var/log/php/phpX.X-yourpool-error.log
+php_admin_flag[log_errors] = on
+
+; Environment variables
+env[HOSTNAME] = $HOSTNAME
+env[PATH] = /usr/local/bin:/usr/bin:/bin
+env[TMP] = /tmp
+env[TMPDIR] = /tmp
+env[TEMP] = /tmp
+
+; PHP Configuration overrides for this pool
+; These override php.ini settings
+
+; Memory limit
+php_admin_value[memory_limit] = 256M
+
+; Maximum execution time
+php_admin_value[max_execution_time] = 300
+
+; Upload limits
+php_admin_value[upload_max_filesize] = 64M
+php_admin_value[post_max_size] = 64M
+
+; Session configuration
+php_value[session.save_handler] = files
+php_value[session.save_path] = /var/lib/php/sessions
+
+; Security settings
+; Disable dangerous functions
+php_admin_value[disable_functions] = exec,passthru,shell_exec,system,proc_open,popen,curl_exec,curl_multi_exec,parse_ini_file,show_source
+
+; Disable file uploads (if not needed)
+; php_admin_flag[file_uploads] = off
+
+; Open basedir restriction (recommended for security)
+; Limits file operations to specified directory
+; php_admin_value[open_basedir] = /var/www/yoursite:/tmp
+
+; Display errors (disable in production)
+php_flag[display_errors] = off
+php_admin_flag[display_startup_errors] = off
+
+; Error reporting
+php_admin_value[error_reporting] = E_ALL & ~E_DEPRECATED & ~E_STRICT
+
+; Opcache settings
+php_value[opcache.enable] = 1
+php_value[opcache.memory_consumption] = 128
+php_value[opcache.interned_strings_buffer] = 8
+php_value[opcache.max_accelerated_files] = 10000
+php_value[opcache.revalidate_freq] = 2
+php_value[opcache.fast_shutdown] = 1
+
+; Timezone
+php_value[date.timezone] = Europe/Berlin

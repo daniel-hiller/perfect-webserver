@@ -1,0 +1,38 @@
+# Logs
+logs/
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/
+*.swp
+*.swo
+*~
+
+# Backup files
+*.backup
+*.bak
+
+# Configuration files with credentials
+.my.cnf
+*.conf.local
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Test files
+test/
+testing/
+*.test
+
+# Local environment
+.env
+.env.local

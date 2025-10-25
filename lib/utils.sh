@@ -17,6 +17,7 @@ log() {
     local message="$*"
     local timestamp
     timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+    mkdir -p /var/log/webhosting-installer
     echo "[${timestamp}] ${message}" | tee -a "${LOG_FILE:-/var/log/webhosting-installer/install.log}"
 }
 

@@ -75,14 +75,13 @@ Mehrfachauswahl möglich - alle Versionen laufen parallel via PHP-FPM." \
         "8.4" "PHP 8.4 (Latest)" OFF)
 
     if [[ -z "${selected}" ]]; then
-        dialog --title "Warnung" \
-            --yesno "Keine PHP-Version ausgewählt.\n\nMöchten Sie ohne PHP fortfahren?" 10 50
-
-        if [[ $? -ne 0 ]]; then
+        if dialog --title "Warnung" \
+            --yesno "Keine PHP-Version ausgewählt.\n\nMöchten Sie ohne PHP fortfahren?" 10 50; then
+            log "No PHP versions selected (user confirmed)"
+        else
             select_php_versions
             return
         fi
-        log "No PHP versions selected (user confirmed)"
     else
         # Convert newline-separated list to array
         mapfile -t PHP_VERSIONS <<< "${selected}"
@@ -98,15 +97,13 @@ Mehrfachauswahl möglich - alle Versionen laufen parallel via PHP-FPM." \
 
 # configure_mariadb_menu: Ask if MariaDB should be installed
 configure_mariadb_menu() {
-    dialog --title "MariaDB Installation" \
+    if dialog --title "MariaDB Installation" \
         --yesno "Möchten Sie MariaDB (MySQL) installieren?\n\n\
 MariaDB ist erforderlich für:\n\
   • WordPress, Joomla, Drupal\n\
   • Die meisten Content-Management-Systeme\n\
   • Datenbankbasierte Anwendungen\n\n\
-Installation empfohlen: Ja" 15 60
-
-    if [[ $? -eq 0 ]]; then
+Installation empfohlen: Ja" 15 60; then
         INSTALL_MARIADB="yes"
         log "MariaDB installation: yes"
         mariadb_root_password
@@ -136,9 +133,8 @@ mariadb_root_password() {
         fi
 
         if [[ ${#password1} -lt 8 ]]; then
-            dialog --title "Warnung" \
-                --yesno "Passwort ist kürzer als 8 Zeichen.\n\nTrotzdem verwenden?" 8 50
-            if [[ $? -ne 0 ]]; then
+            if ! dialog --title "Warnung" \
+                --yesno "Passwort ist kürzer als 8 Zeichen.\n\nTrotzdem verwenden?" 8 50; then
                 continue
             fi
         fi
@@ -162,11 +158,9 @@ mariadb_root_password() {
 
 # database_creation_menu: Ask if database and user should be created
 database_creation_menu() {
-    dialog --title "Datenbank erstellen" \
+    if dialog --title "Datenbank erstellen" \
         --yesno "Möchten Sie jetzt eine Datenbank und einen Benutzer erstellen?\n\n\
-Sie können dies auch später manuell durchführen." 10 60
-
-    if [[ $? -eq 0 ]]; then
+Sie können dies auch später manuell durchführen." 10 60; then
         CREATE_DATABASE="yes"
         log "Database creation: yes"
         prompt_database_details
@@ -261,7 +255,7 @@ Erlaubt: a-z, A-Z, 0-9, _ und -\nMax. 32 Zeichen" 10 50
 
 # configure_certbot_menu: Ask if Certbot should be installed
 configure_certbot_menu() {
-    dialog --title "Certbot/Let's Encrypt" \
+    if dialog --title "Certbot/Let's Encrypt" \
         --yesno "Möchten Sie Certbot für kostenlose SSL-Zertifikate installieren?\n\n\
 Certbot ermöglicht:\n\
   • Kostenlose SSL/TLS Zertifikate von Let's Encrypt\n\
@@ -269,9 +263,7 @@ Certbot ermöglicht:\n\
   • HTTPS für Ihre Websites\n\n\
 Hinweis: Zertifikate müssen nach der Installation\n\
 manuell pro Domain angefordert werden.\n\n\
-Installation empfohlen: Ja" 18 65
-
-    if [[ $? -eq 0 ]]; then
+Installation empfohlen: Ja" 18 65; then
         INSTALL_CERTBOT="yes"
         log "Certbot installation: yes"
     else
@@ -321,12 +313,10 @@ show_summary() {
     summary_text+="===============================================\n\n"
     summary_text+="Fortfahren mit der Installation?"
 
-    dialog --title "Bestätigung" \
+    if ! dialog --title "Bestätigung" \
         --yes-label "Installation starten" \
         --no-label "Abbrechen" \
-        --yesno "${summary_text}" 24 70
-
-    if [[ $? -ne 0 ]]; then
+        --yesno "${summary_text}" 24 70; then
         dialog --title "Abbruch" \
             --msgbox "Installation wurde abgebrochen." 7 40
         clear

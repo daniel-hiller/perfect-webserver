@@ -14,15 +14,15 @@
 # show_welcome: Display welcome message and introduction
 show_welcome() {
     dialog --title "Webhosting Installer" \
-        --msgbox "Willkommen zum Webhosting VM/LXC Installer!\n\n\
-Dieser Installer richtet automatisch eine vollständige\n\
-Webhosting-Umgebung auf Debian 13 ein:\n\n\
-  • PHP 5.6 bis 8.4 (Multi-Version Support)\n\
-  • Nginx oder Apache Webserver\n\
-  • MariaDB Datenbank (optional)\n\
+        --msgbox "Welcome to the Webhosting VM/LXC Installer!\n\n\
+This installer automatically sets up a complete\n\
+webhosting environment on Debian 13:\n\n\
+  • PHP 5.6 to 8.4 (Multi-Version Support)\n\
+  • Nginx or Apache Webserver\n\
+  • MariaDB Database (optional)\n\
   • Certbot/Let's Encrypt SSL (optional)\n\n\
-Die Installation erfolgt interaktiv.\n\
-Drücken Sie OK zum Fortfahren." \
+The installation is interactive.\n\
+Press OK to continue." \
         20 70
     clear
 }
@@ -35,13 +35,13 @@ Drücken Sie OK zum Fortfahren." \
 select_webserver() {
     local choice
 
-    choice=$(dialog --stdout --title "Webserver Auswahl" \
-        --menu "Bitte wählen Sie einen Webserver:" 15 60 2 \
-        "nginx" "Nginx (Empfohlen, leichtgewichtig)" \
-        "apache" "Apache (Klassisch, .htaccess Support)")
+    choice=$(dialog --stdout --title "Webserver Selection" \
+        --menu "Please select a webserver:" 15 60 2 \
+        "nginx" "Nginx (Recommended, lightweight)" \
+        "apache" "Apache (Classic, .htaccess support)")
 
     if [[ -z "${choice}" ]]; then
-        error_exit "Installation abgebrochen: Kein Webserver ausgewählt"
+        error_exit "Installation cancelled: No webserver selected"
     fi
 
     WEBSERVER="${choice}"
@@ -58,9 +58,9 @@ select_php_versions() {
     local selected
 
     selected=$(dialog --stdout --separate-output \
-        --title "PHP Versionen" \
-        --checklist "Wählen Sie PHP-Versionen aus (SPACE zum Auswählen, ENTER zum Bestätigen):\n\n\
-Mehrfachauswahl möglich - alle Versionen laufen parallel via PHP-FPM." \
+        --title "PHP Versions" \
+        --checklist "Select PHP versions (SPACE to select, ENTER to confirm):\n\n\
+Multiple selection possible - all versions run in parallel via PHP-FPM." \
         22 75 11 \
         "5.6" "PHP 5.6 (EOL - Legacy Support)" OFF \
         "7.0" "PHP 7.0 (EOL - Legacy Support)" OFF \
@@ -75,8 +75,8 @@ Mehrfachauswahl möglich - alle Versionen laufen parallel via PHP-FPM." \
         "8.4" "PHP 8.4 (Latest)" OFF)
 
     if [[ -z "${selected}" ]]; then
-        if dialog --title "Warnung" \
-            --yesno "Keine PHP-Version ausgewählt.\n\nMöchten Sie ohne PHP fortfahren?" 10 50; then
+        if dialog --title "Warning" \
+            --yesno "No PHP version selected.\n\nDo you want to continue without PHP?" 10 50; then
             log "No PHP versions selected (user confirmed)"
         else
             select_php_versions
@@ -98,12 +98,12 @@ Mehrfachauswahl möglich - alle Versionen laufen parallel via PHP-FPM." \
 # configure_mariadb_menu: Ask if MariaDB should be installed
 configure_mariadb_menu() {
     if dialog --title "MariaDB Installation" \
-        --yesno "Möchten Sie MariaDB (MySQL) installieren?\n\n\
-MariaDB ist erforderlich für:\n\
+        --yesno "Do you want to install MariaDB (MySQL)?\n\n\
+MariaDB is required for:\n\
   • WordPress, Joomla, Drupal\n\
-  • Die meisten Content-Management-Systeme\n\
-  • Datenbankbasierte Anwendungen\n\n\
-Installation empfohlen: Ja" 15 60; then
+  • Most Content Management Systems\n\
+  • Database-driven applications\n\n\
+Recommended: Yes" 15 60; then
         INSTALL_MARIADB="yes"
         log "MariaDB installation: yes"
         mariadb_root_password
@@ -122,29 +122,29 @@ mariadb_root_password() {
     local password2
 
     while true; do
-        password1=$(dialog --stdout --title "MariaDB Root-Passwort" \
+        password1=$(dialog --stdout --title "MariaDB Root Password" \
             --insecure --passwordbox \
-            "Bitte geben Sie ein Root-Passwort für MariaDB ein:\n\n\
-(Mindestens 8 Zeichen empfohlen)" 12 60)
+            "Please enter a root password for MariaDB:\n\n\
+(At least 8 characters recommended)" 12 60)
 
         if [[ -z "${password1}" ]]; then
-            dialog --title "Fehler" --msgbox "Passwort darf nicht leer sein!" 7 50
+            dialog --title "Error" --msgbox "Password cannot be empty!" 7 50
             continue
         fi
 
         if [[ ${#password1} -lt 8 ]]; then
-            if ! dialog --title "Warnung" \
-                --yesno "Passwort ist kürzer als 8 Zeichen.\n\nTrotzdem verwenden?" 8 50; then
+            if ! dialog --title "Warning" \
+                --yesno "Password is shorter than 8 characters.\n\nUse anyway?" 8 50; then
                 continue
             fi
         fi
 
-        password2=$(dialog --stdout --title "MariaDB Root-Passwort" \
+        password2=$(dialog --stdout --title "MariaDB Root Password" \
             --insecure --passwordbox \
-            "Bitte bestätigen Sie das Root-Passwort:" 10 60)
+            "Please confirm the root password:" 10 60)
 
         if [[ "${password1}" != "${password2}" ]]; then
-            dialog --title "Fehler" --msgbox "Passwörter stimmen nicht überein!" 7 50
+            dialog --title "Error" --msgbox "Passwords do not match!" 7 50
             continue
         fi
 
@@ -158,9 +158,9 @@ mariadb_root_password() {
 
 # database_creation_menu: Ask if database and user should be created
 database_creation_menu() {
-    if dialog --title "Datenbank erstellen" \
-        --yesno "Möchten Sie jetzt eine Datenbank und einen Benutzer erstellen?\n\n\
-Sie können dies auch später manuell durchführen." 10 60; then
+    if dialog --title "Create Database" \
+        --yesno "Do you want to create a database and user now?\n\n\
+You can also do this manually later." 10 60; then
         CREATE_DATABASE="yes"
         log "Database creation: yes"
         prompt_database_details
@@ -176,19 +176,19 @@ Sie können dies auch später manuell durchführen." 10 60; then
 prompt_database_details() {
     # Database name
     while true; do
-        DB_NAME=$(dialog --stdout --title "Datenbank Name" \
-            --inputbox "Bitte geben Sie einen Datenbanknamen ein:\n\n\
-(Alphanumerisch, Unterstriche und Bindestriche erlaubt)" 12 60)
+        DB_NAME=$(dialog --stdout --title "Database Name" \
+            --inputbox "Please enter a database name:\n\n\
+(Alphanumeric, underscores and hyphens allowed)" 12 60)
 
         if [[ -z "${DB_NAME}" ]]; then
-            dialog --title "Fehler" --msgbox "Datenbankname darf nicht leer sein!" 7 50
+            dialog --title "Error" --msgbox "Database name cannot be empty!" 7 50
             continue
         fi
 
         if ! validate_db_name "${DB_NAME}"; then
-            dialog --title "Fehler" \
-                --msgbox "Ungültiger Datenbankname!\n\n\
-Erlaubt: a-z, A-Z, 0-9, _ und -\nMax. 64 Zeichen" 10 50
+            dialog --title "Error" \
+                --msgbox "Invalid database name!\n\n\
+Allowed: a-z, A-Z, 0-9, _ and -\nMax. 64 characters" 10 50
             continue
         fi
 
@@ -197,19 +197,19 @@ Erlaubt: a-z, A-Z, 0-9, _ und -\nMax. 64 Zeichen" 10 50
 
     # Database user
     while true; do
-        DB_USER=$(dialog --stdout --title "Datenbank Benutzer" \
-            --inputbox "Bitte geben Sie einen Benutzernamen ein:\n\n\
-(Alphanumerisch, Unterstriche und Bindestriche erlaubt)" 12 60)
+        DB_USER=$(dialog --stdout --title "Database User" \
+            --inputbox "Please enter a username:\n\n\
+(Alphanumeric, underscores and hyphens allowed)" 12 60)
 
         if [[ -z "${DB_USER}" ]]; then
-            dialog --title "Fehler" --msgbox "Benutzername darf nicht leer sein!" 7 50
+            dialog --title "Error" --msgbox "Username cannot be empty!" 7 50
             continue
         fi
 
         if ! validate_username "${DB_USER}"; then
-            dialog --title "Fehler" \
-                --msgbox "Ungültiger Benutzername!\n\n\
-Erlaubt: a-z, A-Z, 0-9, _ und -\nMax. 32 Zeichen" 10 50
+            dialog --title "Error" \
+                --msgbox "Invalid username!\n\n\
+Allowed: a-z, A-Z, 0-9, _ and -\nMax. 32 characters" 10 50
             continue
         fi
 
@@ -221,22 +221,22 @@ Erlaubt: a-z, A-Z, 0-9, _ und -\nMax. 32 Zeichen" 10 50
     local password2
 
     while true; do
-        password1=$(dialog --stdout --title "Datenbank Passwort" \
+        password1=$(dialog --stdout --title "Database Password" \
             --insecure --passwordbox \
-            "Bitte geben Sie ein Passwort für den Benutzer '${DB_USER}' ein:\n\n\
-(Mindestens 8 Zeichen empfohlen)" 12 60)
+            "Please enter a password for user '${DB_USER}':\n\n\
+(At least 8 characters recommended)" 12 60)
 
         if [[ -z "${password1}" ]]; then
-            dialog --title "Fehler" --msgbox "Passwort darf nicht leer sein!" 7 50
+            dialog --title "Error" --msgbox "Password cannot be empty!" 7 50
             continue
         fi
 
-        password2=$(dialog --stdout --title "Datenbank Passwort" \
+        password2=$(dialog --stdout --title "Database Password" \
             --insecure --passwordbox \
-            "Bitte bestätigen Sie das Passwort:" 10 60)
+            "Please confirm the password:" 10 60)
 
         if [[ "${password1}" != "${password2}" ]]; then
-            dialog --title "Fehler" --msgbox "Passwörter stimmen nicht überein!" 7 50
+            dialog --title "Error" --msgbox "Passwords do not match!" 7 50
             continue
         fi
 
@@ -256,14 +256,14 @@ Erlaubt: a-z, A-Z, 0-9, _ und -\nMax. 32 Zeichen" 10 50
 # configure_certbot_menu: Ask if Certbot should be installed
 configure_certbot_menu() {
     if dialog --title "Certbot/Let's Encrypt" \
-        --yesno "Möchten Sie Certbot für kostenlose SSL-Zertifikate installieren?\n\n\
-Certbot ermöglicht:\n\
-  • Kostenlose SSL/TLS Zertifikate von Let's Encrypt\n\
-  • Automatische Erneuerung der Zertifikate\n\
-  • HTTPS für Ihre Websites\n\n\
-Hinweis: Zertifikate müssen nach der Installation\n\
-manuell pro Domain angefordert werden.\n\n\
-Installation empfohlen: Ja" 18 65; then
+        --yesno "Do you want to install Certbot for free SSL certificates?\n\n\
+Certbot provides:\n\
+  • Free SSL/TLS certificates from Let's Encrypt\n\
+  • Automatic certificate renewal\n\
+  • HTTPS for your websites\n\n\
+Note: Certificates must be requested manually\n\
+per domain after installation.\n\n\
+Recommended: Yes" 18 65; then
         INSTALL_CERTBOT="yes"
         log "Certbot installation: yes"
     else
@@ -280,29 +280,29 @@ Installation empfohlen: Ja" 18 65; then
 
 # show_summary: Display configuration summary and confirm
 show_summary() {
-    local summary_text="INSTALLATIONS-ZUSAMMENFASSUNG\n"
+    local summary_text="INSTALLATION SUMMARY\n"
     summary_text+="===============================================\n\n"
 
     # Webserver
-    summary_text+="Webserver:       ${WEBSERVER:-Keiner}\n\n"
+    summary_text+="Webserver:       ${WEBSERVER:-None}\n\n"
 
     # PHP Versions
-    summary_text+="PHP Versionen:   "
+    summary_text+="PHP Versions:    "
     if [[ ${#PHP_VERSIONS[@]} -gt 0 ]]; then
         summary_text+="${PHP_VERSIONS[*]}\n"
     else
-        summary_text+="Keine\n"
+        summary_text+="None\n"
     fi
     summary_text+="\n"
 
     # MariaDB
     summary_text+="MariaDB:         ${INSTALL_MARIADB}\n"
     if [[ "${INSTALL_MARIADB}" == "yes" ]]; then
-        summary_text+="  Root-PW:       [Konfiguriert]\n"
+        summary_text+="  Root-PW:       [Configured]\n"
         if [[ "${CREATE_DATABASE}" == "yes" ]]; then
-            summary_text+="  Datenbank:     ${DB_NAME}\n"
-            summary_text+="  Benutzer:      ${DB_USER}\n"
-            summary_text+="  User-PW:       [Konfiguriert]\n"
+            summary_text+="  Database:      ${DB_NAME}\n"
+            summary_text+="  User:          ${DB_USER}\n"
+            summary_text+="  User-PW:       [Configured]\n"
         fi
     fi
     summary_text+="\n"
@@ -311,14 +311,14 @@ show_summary() {
     summary_text+="Certbot/SSL:     ${INSTALL_CERTBOT}\n\n"
 
     summary_text+="===============================================\n\n"
-    summary_text+="Fortfahren mit der Installation?"
+    summary_text+="Proceed with installation?"
 
-    if ! dialog --title "Bestätigung" \
-        --yes-label "Installation starten" \
-        --no-label "Abbrechen" \
+    if ! dialog --title "Confirmation" \
+        --yes-label "Start Installation" \
+        --no-label "Cancel" \
         --yesno "${summary_text}" 24 70; then
-        dialog --title "Abbruch" \
-            --msgbox "Installation wurde abgebrochen." 7 40
+        dialog --title "Cancelled" \
+            --msgbox "Installation was cancelled." 7 40
         clear
         log "Installation cancelled by user"
         exit 0
@@ -337,7 +337,7 @@ show_completion() {
     local ip_address
     ip_address=$(get_primary_ip)
 
-    local completion_text="INSTALLATION ERFOLGREICH!\n"
+    local completion_text="INSTALLATION SUCCESSFUL!\n"
     completion_text+="===============================================\n\n"
 
     # Webserver info
@@ -348,7 +348,7 @@ show_completion() {
 
     # PHP info
     if [[ ${#PHP_VERSIONS[@]} -gt 0 ]]; then
-        completion_text+="PHP Versionen:   ${PHP_VERSIONS[*]}\n"
+        completion_text+="PHP Versions:    ${PHP_VERSIONS[*]}\n"
         completion_text+="FPM Sockets:     /run/php/php*-fpm.sock\n\n"
     fi
 
@@ -356,24 +356,24 @@ show_completion() {
     if [[ "${INSTALL_MARIADB}" == "yes" ]]; then
         completion_text+="MariaDB:         localhost:3306\n"
         if [[ "${CREATE_DATABASE}" == "yes" ]]; then
-            completion_text+="Datenbank:       ${DB_NAME}\n"
-            completion_text+="Benutzer:        ${DB_USER}\n"
+            completion_text+="Database:        ${DB_NAME}\n"
+            completion_text+="User:            ${DB_USER}\n"
         fi
         completion_text+="\n"
     fi
 
     # Certbot info
     if [[ "${INSTALL_CERTBOT}" == "yes" ]]; then
-        completion_text+="Certbot:         Installiert\n"
-        completion_text+="SSL-Zertifikat:  certbot --${WEBSERVER} -d domain.com\n\n"
+        completion_text+="Certbot:         Installed\n"
+        completion_text+="SSL Certificate: certbot --${WEBSERVER} -d domain.com\n\n"
     fi
 
     completion_text+="===============================================\n\n"
-    completion_text+="Logdateien:      ${LOG_DIR}/\n"
+    completion_text+="Log files:       ${LOG_DIR}/\n"
     completion_text+="Report:          ${LOG_DIR}/installation-report.txt\n\n"
-    completion_text+="Drücken Sie OK zum Beenden."
+    completion_text+="Press OK to exit."
 
-    dialog --title "Installation Abgeschlossen" \
+    dialog --title "Installation Complete" \
         --msgbox "${completion_text}" 24 70
 
     clear
@@ -381,7 +381,7 @@ show_completion() {
     # Also print to console
     echo ""
     echo "==============================================="
-    echo "  INSTALLATION ERFOLGREICH ABGESCHLOSSEN"
+    echo "  INSTALLATION COMPLETED SUCCESSFULLY"
     echo "==============================================="
     echo ""
     if [[ -n "${WEBSERVER}" ]]; then

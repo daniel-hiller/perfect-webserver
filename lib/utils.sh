@@ -86,6 +86,34 @@ check_debian_13() {
     log "Debian 13 (Trixie) verified"
 }
 
+# check_lxc_container: Verify LXC container is unprivileged
+# Exit if running in privileged LXC container
+check_lxc_container() {
+    # Check if running in LXC container
+    if ! grep -q 'container=lxc' /proc/1/environ 2>/dev/null; then
+        log "Running on bare metal or VM (not LXC)"
+        return 0
+    fi
+
+    log "LXC container detected - verifying configuration..."
+
+    # Check if unprivileged container
+    if [[ ! -f /proc/self/uid_map ]]; then
+        error_exit "Cannot determine LXC container type: /proc/self/uid_map not found"
+    fi
+
+    local uid_map
+    uid_map=$(cat /proc/self/uid_map)
+
+    # Check for privileged container (0 0 4294967295)
+    if [[ "$uid_map" == "0 0 4294967295" ]]; then
+        error_exit "PRIVILEGED LXC container detected!\n\nThis installer requires an UNPRIVILEGED LXC container.\n\nPlease recreate your container with:\npct set <CTID> -unprivileged 1 -features keyctl=1,nesting=1\n\nThen reinstall Debian 13 in the new container."
+    fi
+
+    # Unprivileged container detected (e.g., "0 100000 65536")
+    log "Unprivileged LXC container verified (recommended configuration)"
+}
+
 # setup_locale: Configure system locale to en_US.UTF-8
 # Fixes locale issues in LXC containers and minimal installations
 setup_locale() {

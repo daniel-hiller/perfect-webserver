@@ -25,7 +25,7 @@ A fully automated, modular installer for production-ready webhosting environment
 
 ### LXC Container Requirements (Proxmox)
 
-If running in an LXC container, **unprivileged containers are strongly recommended**:
+If running in an LXC container, **unprivileged containers are REQUIRED**:
 
 ```bash
 # On Proxmox host, configure container:
@@ -33,10 +33,10 @@ pct set <CTID> -unprivileged 1 -features keyctl=1,nesting=1
 ```
 
 **Important Notes:**
-- **Unprivileged containers** work out-of-the-box without modifications
-- **Privileged containers** require systemd overrides (applied automatically by installer)
+- **Unprivileged containers ONLY** - Privileged containers are NOT supported
 - Required features: `keyctl=1` and `nesting=1` for MariaDB and systemd compatibility
-- The installer detects container type and applies fixes automatically if needed
+- The installer will abort if a privileged container is detected
+- For VMs or bare metal installations, no special configuration is needed
 
 ## 🔧 Installation
 
@@ -206,24 +206,21 @@ perfect-webserver/
 
 ### LXC Container Issues (Proxmox)
 
-**MariaDB fails to start with status=226/NAMESPACE:**
+**Installer aborts: "PRIVILEGED LXC container detected"**
 
-This typically occurs in **privileged** LXC containers. Solutions:
+The installer requires unprivileged LXC containers. To fix:
 
-1. **Recommended**: Use unprivileged container (requires container recreation):
+1. Create a new unprivileged container:
    \`\`\`bash
    # On Proxmox host:
    pct set <CTID> -unprivileged 1 -features keyctl=1,nesting=1
    \`\`\`
 
-2. **Alternative**: The installer applies systemd overrides automatically for privileged containers, but unprivileged is preferred.
-
-3. **Verify container type:**
+2. Verify container type inside the container:
    \`\`\`bash
-   # Inside container:
    cat /proc/self/uid_map
-   # "0 0 4294967295" = privileged
-   # "0 100000 65536" = unprivileged (recommended)
+   # "0 0 4294967295" = privileged (NOT supported)
+   # "0 100000 65536" = unprivileged (required)
    \`\`\`
 
 **Locale warnings during installation:**

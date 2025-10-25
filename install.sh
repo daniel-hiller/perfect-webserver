@@ -78,6 +78,9 @@ pre_flight_checks() {
     # Verify Debian 13
     check_debian_13
 
+    # Check for LXC container and verify unprivileged
+    check_lxc_container
+
     # Setup locale (important for LXC containers)
     setup_locale
 

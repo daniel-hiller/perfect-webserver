@@ -15,22 +15,6 @@
 install_mariadb() {
     log "Installing MariaDB server..."
 
-    # Check for unprivileged container (recommended for LXC)
-    if grep -q 'container=lxc' /proc/1/environ 2>/dev/null; then
-        if [[ -f /proc/self/uid_map ]]; then
-            local uid_map
-            uid_map=$(cat /proc/self/uid_map)
-            if [[ "$uid_map" == "0 0 4294967295" ]]; then
-                log "WARNING: Running in PRIVILEGED LXC container"
-                log "WARNING: Unprivileged containers are recommended for better security"
-                log "WARNING: If MariaDB fails to start, consider using unprivileged container"
-                log "WARNING: Or ensure LXC features: keyctl=1,nesting=1 are enabled"
-            else
-                log "Unprivileged LXC container detected (recommended)"
-            fi
-        fi
-    fi
-
     # Install dependencies first
     log "Installing MariaDB dependencies..."
     local deps=("gawk" "rsync" "socat" "libdbi-perl" "pv")
@@ -77,32 +61,6 @@ EOF
         error_exit "Failed to install MariaDB packages"
     }
 
-    # Check if running in privileged container - apply fixes if needed
-    if grep -q 'container=lxc' /proc/1/environ 2>/dev/null; then
-        local uid_map
-        uid_map=$(cat /proc/self/uid_map 2>/dev/null)
-        if [[ "$uid_map" == "0 0 4294967295" ]]; then
-            log "Privileged container detected, applying compatibility fixes..."
-
-            mkdir -p /etc/systemd/system/mariadb.service.d/
-
-            cat > /etc/systemd/system/mariadb.service.d/lxc-privileged.conf << 'EOF'
-[Service]
-# Fix for privileged LXC containers
-# Replace ExecStartPre with + prefix that fails with NAMESPACE error
-ExecStartPre=
-ExecStartPre=/bin/sh -c 'mkdir -p /run/mysqld && chown mysql:mysql /run/mysqld && chmod 755 /run/mysqld'
-ExecStartPre=/bin/sh -c "[ ! -e /usr/bin/galera_recovery ] && VAR= || VAR=\`/usr/bin/galera_recovery\`; [ \$? -eq 0 ] && echo _WSREP_START_POSITION=\$VAR > /run/mysqld/wsrep-start-position || exit 1"
-
-PrivateTmp=no
-ProtectSystem=no
-EOF
-
-            log "Applied fixes for privileged LXC container"
-            systemctl daemon-reload
-        fi
-    fi
-
     # Enable and start MariaDB
     log "Enabling and starting MariaDB service..."
     systemctl enable mariadb || log "Warning: Failed to enable MariaDB service"
@@ -129,14 +87,6 @@ EOF
         log "ERROR: Failed to start MariaDB after ${start_attempts} attempts"
         log "Checking MariaDB logs..."
         journalctl -u mariadb -n 50 --no-pager | tee -a "${LOG_FILE}" || true
-
-        # Additional debug info for containers
-        if grep -q 'container=' /proc/1/environ 2>/dev/null; then
-            log "Container detected. Please ensure LXC features are enabled:"
-            log "  - unprivileged: 1 (recommended)"
-            log "  - features: keyctl=1,nesting=1"
-            log "Run on Proxmox host: pct set <CTID> -unprivileged 1 -features keyctl=1,nesting=1"
-        fi
 
         error_exit "MariaDB service failed to start. Check logs for details."
     fi

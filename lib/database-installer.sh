@@ -19,18 +19,91 @@ install_mariadb() {
     install_package "mariadb-server"
     install_package "mariadb-client"
 
+    # Fix MariaDB for container environments (LXC/Docker)
+    log "Configuring MariaDB for container compatibility..."
+
+    # Create runtime directory manually (sometimes missing in containers)
+    mkdir -p /var/run/mysqld
+    chown mysql:mysql /var/run/mysqld
+    chmod 755 /var/run/mysqld
+
+    # Create systemd override directory
+    mkdir -p /etc/systemd/system/mariadb.service.d/
+
+    # Create override configuration to disable problematic systemd features
+    cat > /etc/systemd/system/mariadb.service.d/container-override.conf << 'EOF'
+[Service]
+# Remove ExecStartPre that tries to use install with namespace features
+ExecStartPre=
+
+# Ensure runtime directory exists
+RuntimeDirectory=mysqld
+RuntimeDirectoryMode=0755
+
+# Disable systemd hardening features that may not work in containers
+PrivateNetwork=no
+PrivateTmp=no
+ProtectHome=no
+ProtectSystem=no
+PrivateDevices=no
+NoNewPrivileges=no
+ProtectKernelTunables=no
+ProtectKernelModules=no
+ProtectControlGroups=no
+RestrictRealtime=no
+RestrictNamespaces=no
+RestrictAddressFamilies=no
+LockPersonality=no
+MemoryDenyWriteExecute=no
+RestrictSUIDSGID=no
+EOF
+
+    log "MariaDB systemd overrides created for container compatibility"
+
+    # Reload systemd to apply changes
+    systemctl daemon-reload
+
     # Enable and start MariaDB
-    enable_service "mariadb"
+    log "Enabling and starting MariaDB service..."
+    systemctl enable mariadb || log "Warning: Failed to enable MariaDB service"
+
+    # Start MariaDB (with retry for LXC containers)
+    local start_attempts=3
+    local attempt=0
+    local service_started=false
+
+    while [[ ${attempt} -lt ${start_attempts} ]]; do
+        attempt=$((attempt + 1))
+        log "Starting MariaDB (attempt ${attempt}/${start_attempts})..."
+
+        if systemctl start mariadb; then
+            service_started=true
+            break
+        else
+            log "Failed to start MariaDB, waiting 3 seconds before retry..."
+            sleep 3
+        fi
+    done
+
+    if [[ "${service_started}" != "true" ]]; then
+        log "ERROR: Failed to start MariaDB after ${start_attempts} attempts"
+        log "Checking MariaDB logs..."
+        journalctl -u mariadb -n 50 --no-pager | tee -a "${LOG_FILE}" || true
+        error_exit "MariaDB service failed to start. Check logs for details."
+    fi
 
     # Wait for MariaDB to be ready
     log "Waiting for MariaDB to be ready..."
     local retries=30
     local count=0
 
-    while ! mysqladmin ping --silent; do
+    while ! mysqladmin ping --silent 2>/dev/null; do
         count=$((count + 1))
         if [[ ${count} -ge ${retries} ]]; then
-            error_exit "MariaDB failed to start within timeout period"
+            log "ERROR: MariaDB not responding after ${retries} seconds"
+            log "Checking MariaDB status..."
+            systemctl status mariadb --no-pager | tee -a "${LOG_FILE}" || true
+            error_exit "MariaDB failed to become ready within timeout period"
         fi
         sleep 1
     done

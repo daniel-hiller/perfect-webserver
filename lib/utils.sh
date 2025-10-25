@@ -86,6 +86,48 @@ check_debian_13() {
     log "Debian 13 (Trixie) verified"
 }
 
+# setup_locale: Configure system locale to en_US.UTF-8
+# Fixes locale issues in LXC containers and minimal installations
+setup_locale() {
+    log "Setting up system locale..."
+
+    # Check if locales package is installed
+    if ! dpkg -l locales &> /dev/null; then
+        log "Installing locales package..."
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq locales || {
+            log "Warning: Failed to install locales package"
+            return 1
+        }
+    fi
+
+    # Generate en_US.UTF-8 locale if not present
+    if ! locale -a | grep -q "en_US.utf8"; then
+        log "Generating en_US.UTF-8 locale..."
+
+        # Uncomment en_US.UTF-8 in locale.gen
+        sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
+
+        # Generate locales
+        locale-gen en_US.UTF-8 || {
+            log "Warning: Failed to generate locale"
+            return 1
+        }
+    fi
+
+    # Set system locale
+    log "Setting system locale to en_US.UTF-8..."
+    update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 || {
+        log "Warning: Failed to update locale"
+    }
+
+    # Export for current session
+    export LANG=en_US.UTF-8
+    export LC_ALL=en_US.UTF-8
+    export LANGUAGE=en_US:en
+
+    log "Locale setup completed (en_US.UTF-8)"
+}
+
 # ============================================================================
 # CONFIGURATION MANAGEMENT
 # ============================================================================

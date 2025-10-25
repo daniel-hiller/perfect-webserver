@@ -78,6 +78,9 @@ pre_flight_checks() {
     # Verify Debian 13
     check_debian_13
 
+    # Setup locale (important for LXC containers)
+    setup_locale
+
     # Create log directory
     mkdir -p "${LOG_DIR}"
     chmod 755 "${LOG_DIR}"

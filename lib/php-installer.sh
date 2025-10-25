@@ -69,6 +69,13 @@ install_php_version() {
 
     log "Installing PHP ${version}..."
 
+    # Check if already installed
+    if command -v "php${version}" &> /dev/null && systemctl is-active --quiet "php${version}-fpm"; then
+        log "PHP ${version} is already installed and running"
+        log "Skipping PHP ${version} installation..."
+        return 0
+    fi
+
     # Define package list
     local packages=(
         "php${version}-fpm"

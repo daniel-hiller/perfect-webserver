@@ -454,6 +454,111 @@ cleanup_temp_files() {
 }
 
 # ============================================================================
+# MARIADB COMMAND WRAPPER
+# ============================================================================
+
+# mysql_cmd: Use mariadb command if available, fallback to mysql
+# MariaDB 10.5+ introduced mariadb command, mysql is deprecated
+mysql_cmd() {
+    if command -v mariadb &> /dev/null; then
+        mariadb "$@"
+    else
+        mysql "$@"
+    fi
+}
+
+# mysqladmin_cmd: Use mariadb-admin if available, fallback to mysqladmin
+mysqladmin_cmd() {
+    if command -v mariadb-admin &> /dev/null; then
+        mariadb-admin "$@"
+    else
+        mysqladmin "$@"
+    fi
+}
+
+# ============================================================================
+# INSTALLATION STATE MANAGEMENT
+# ============================================================================
+
+readonly STATE_FILE="/root/.webhosting-installer-state"
+readonly CREDENTIALS_FILE="/root/.webhosting-credentials"
+
+# save_installation_state: Save installation state and configuration
+save_installation_state() {
+    log "Saving installation state..."
+
+    cat > "${STATE_FILE}" << EOF
+# Webhosting Installer - Installation State
+# Generated: $(date '+%Y-%m-%d %H:%M:%S')
+
+INSTALL_DATE="${INSTALL_DATE}"
+DEBIAN_VERSION="${DEBIAN_VERSION}"
+WEBSERVER="${WEBSERVER}"
+PHP_VERSIONS="${PHP_VERSIONS[*]}"
+INSTALL_MARIADB="${INSTALL_MARIADB}"
+INSTALL_CERTBOT="${INSTALL_CERTBOT}"
+CREATE_DATABASE="${CREATE_DATABASE}"
+DB_NAME="${DB_NAME}"
+DB_USER="${DB_USER}"
+DB_HOST="${DB_HOST}"
+MARIADB_VERSION="${MARIADB_VERSION:-unknown}"
+EOF
+
+    chmod 600 "${STATE_FILE}"
+    log "Installation state saved to ${STATE_FILE}"
+}
+
+# save_credentials: Save passwords to secure file
+save_credentials() {
+    log "Saving credentials to secure file..."
+
+    cat > "${CREDENTIALS_FILE}" << EOF
+# Webhosting Installer - Credentials Backup
+# Generated: $(date '+%Y-%m-%d %H:%M:%S')
+# KEEP THIS FILE SECURE - Contains sensitive passwords!
+
+# MariaDB Root Password
+DB_ROOT_PASSWORD="${DB_ROOT_PASSWORD}"
+
+# Database User Credentials (if created)
+DB_NAME="${DB_NAME}"
+DB_USER="${DB_USER}"
+DB_PASSWORD="${DB_PASSWORD}"
+DB_HOST="${DB_HOST}"
+
+# Connection Examples:
+# mariadb -u ${DB_USER} -p'${DB_PASSWORD}' ${DB_NAME}
+# mariadb -u root -p'${DB_ROOT_PASSWORD}'
+#
+# Legacy (deprecated but still works):
+# mysql -u ${DB_USER} -p'${DB_PASSWORD}' ${DB_NAME}
+# mysql -u root -p'${DB_ROOT_PASSWORD}'
+EOF
+
+    chmod 600 "${CREDENTIALS_FILE}"
+    log "Credentials saved to ${CREDENTIALS_FILE}"
+    log "WARNING: Keep this file secure!"
+}
+
+# check_previous_installation: Check if installer was already run
+check_previous_installation() {
+    if [[ -f "${STATE_FILE}" ]]; then
+        log "Previous installation detected!"
+        log "State file: ${STATE_FILE}"
+
+        # Source previous state
+        source "${STATE_FILE}"
+
+        log "Previous installation from: ${INSTALL_DATE}"
+        log "Installed components: Webserver=${WEBSERVER}, MariaDB=${INSTALL_MARIADB}, Certbot=${INSTALL_CERTBOT}"
+
+        return 0
+    fi
+
+    return 1
+}
+
+# ============================================================================
 # END OF UTILS
 # ============================================================================
 

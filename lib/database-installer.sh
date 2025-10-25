@@ -15,6 +15,15 @@
 install_mariadb() {
     log "Installing MariaDB server..."
 
+    # Check if MariaDB is already installed
+    if systemctl is-active --quiet mariadb && command -v mariadb &> /dev/null; then
+        local installed_version
+        installed_version=$(mysql_cmd --version | awk '{print $5}' | sed 's/,//')
+        log "MariaDB is already installed (version: ${installed_version})"
+        log "Skipping MariaDB installation..."
+        return 0
+    fi
+
     # Install dependencies first
     log "Installing MariaDB dependencies..."
     local deps=("gawk" "rsync" "socat" "libdbi-perl" "pv")
@@ -38,9 +47,13 @@ install_mariadb() {
     gpg --dearmor < /tmp/mariadb-keyring.gpg > /usr/share/keyrings/mariadb-keyring.gpg 2>/dev/null
     rm -f /tmp/mariadb-keyring.gpg
 
-    # Determine latest stable MariaDB version
-    local mariadb_version="11.8"  # LTS version
-    log "Using MariaDB version: ${mariadb_version}"
+    # MariaDB version selection
+    # 11.8 = Current LTS (Long Term Support) - maintained until May 2031
+    # 11.4 = Previous LTS - maintained until May 2029
+    # See: https://mariadb.org/about/#maintenance-policy
+    # Override with: MARIADB_VERSION=11.4 ./install.sh
+    local mariadb_version="${MARIADB_VERSION:-11.8}"
+    log "Using MariaDB version: ${mariadb_version} (LTS)"
 
     # Add MariaDB repository
     cat > /etc/apt/sources.list.d/mariadb.list << EOF
@@ -96,7 +109,7 @@ EOF
     local retries=30
     local count=0
 
-    while ! mysqladmin ping --silent 2>/dev/null; do
+    while ! mysqladmin_cmd ping --silent 2>/dev/null; do
         count=$((count + 1))
         if [[ ${count} -ge ${retries} ]]; then
             log "ERROR: MariaDB not responding after ${retries} seconds"
@@ -111,7 +124,7 @@ EOF
 
     # Verify installation
     local mariadb_version_installed
-    mariadb_version_installed=$(mysql --version | awk '{print $5}' | sed 's/,//')
+    mariadb_version_installed=$(mysql_cmd --version | awk '{print $5}' | sed 's/,//')
     log "MariaDB version: ${mariadb_version_installed}"
 
     log "MariaDB installation completed successfully"
@@ -131,7 +144,7 @@ secure_mariadb() {
 
     # Set root password
     log "Setting MariaDB root password..."
-    mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_ROOT_PASSWORD}';" || {
+    mysql_cmd -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_ROOT_PASSWORD}';" || {
         error_exit "Failed to set MariaDB root password"
     }
 
@@ -145,28 +158,28 @@ EOF
 
     # Remove anonymous users
     log "Removing anonymous users..."
-    mysql -e "DELETE FROM mysql.user WHERE User='';" || {
+    mysql_cmd -e "DELETE FROM mysql.user WHERE User='';" || {
         log "Warning: Failed to remove anonymous users"
     }
 
     # Disallow root login remotely
     log "Disabling remote root login..."
-    mysql -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');" || {
+    mysql_cmd -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');" || {
         log "Warning: Failed to disable remote root login"
     }
 
     # Remove test database
     log "Removing test database..."
-    mysql -e "DROP DATABASE IF EXISTS test;" || {
+    mysql_cmd -e "DROP DATABASE IF EXISTS test;" || {
         log "Warning: Failed to remove test database"
     }
-    mysql -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';" || {
+    mysql_cmd -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';" || {
         log "Warning: Failed to remove test database privileges"
     }
 
     # Flush privileges
     log "Flushing privileges..."
-    mysql -e "FLUSH PRIVILEGES;" || {
+    mysql_cmd -e "FLUSH PRIVILEGES;" || {
         error_exit "Failed to flush privileges"
     }
 
@@ -187,7 +200,7 @@ create_database() {
 
     # Check if database exists
     local db_exists
-    db_exists=$(mysql -sNe "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='${DB_NAME}'")
+    db_exists=$(mysql_cmd -sNe "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='${DB_NAME}'")
 
     if [[ -n "${db_exists}" ]]; then
         log "Database ${DB_NAME} already exists"
@@ -195,7 +208,7 @@ create_database() {
     fi
 
     # Create database
-    mysql -e "CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" || {
+    mysql_cmd -e "CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" || {
         error_exit "Failed to create database: ${DB_NAME}"
     }
 
@@ -216,16 +229,16 @@ create_db_user() {
 
     # Check if user exists
     local user_exists
-    user_exists=$(mysql -sNe "SELECT User FROM mysql.user WHERE User='${DB_USER}' AND Host='localhost'")
+    user_exists=$(mysql_cmd -sNe "SELECT User FROM mysql.user WHERE User='${DB_USER}' AND Host='localhost'")
 
     if [[ -n "${user_exists}" ]]; then
         log "User ${DB_USER} already exists, updating password..."
-        mysql -e "ALTER USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';" || {
+        mysql_cmd -e "ALTER USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';" || {
             error_exit "Failed to update password for user: ${DB_USER}"
         }
     else
         # Create user
-        mysql -e "CREATE USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';" || {
+        mysql_cmd -e "CREATE USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';" || {
             error_exit "Failed to create user: ${DB_USER}"
         }
         log "User created: ${DB_USER}"
@@ -245,12 +258,12 @@ grant_privileges() {
     fi
 
     # Grant all privileges on database
-    mysql -e "GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost';" || {
+    mysql_cmd -e "GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost';" || {
         error_exit "Failed to grant privileges to ${DB_USER} on ${DB_NAME}"
     }
 
     # Flush privileges
-    mysql -e "FLUSH PRIVILEGES;" || {
+    mysql_cmd -e "FLUSH PRIVILEGES;" || {
         error_exit "Failed to flush privileges"
     }
 

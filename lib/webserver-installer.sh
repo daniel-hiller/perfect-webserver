@@ -15,6 +15,13 @@
 install_nginx() {
     log "Installing Nginx webserver..."
 
+    # Check if already installed
+    if command -v nginx &> /dev/null && systemctl is-active --quiet nginx; then
+        log "Nginx is already installed and running"
+        log "Skipping Nginx installation..."
+        return 0
+    fi
+
     # Install Nginx
     install_package "nginx"
 
@@ -247,6 +254,13 @@ EOF
 # install_apache: Install and configure Apache webserver
 install_apache() {
     log "Installing Apache webserver..."
+
+    # Check if already installed
+    if command -v apache2 &> /dev/null && systemctl is-active --quiet apache2; then
+        log "Apache is already installed and running"
+        log "Skipping Apache installation..."
+        return 0
+    fi
 
     # Install Apache
     install_package "apache2"

@@ -52,7 +52,21 @@ chmod +x install.sh
 
 # Start installation
 sudo ./install.sh
+
+# Optional: Override MariaDB version (default: 11.8)
+sudo MARIADB_VERSION=11.4 ./install.sh
 \`\`\`
+
+### Re-running the Installer
+
+The installer is **idempotent** - you can safely re-run it:
+
+- Already installed components are automatically detected and skipped
+- New components can be added without reinstalling existing ones
+- Installation state is tracked in: `/root/.webhosting-installer-state`
+- Credentials are backed up in: `/root/.webhosting-credentials`
+
+**Example:** If you initially installed only Nginx+PHP, you can re-run to add MariaDB without affecting your existing setup.
 
 ### Interactive Installation Process
 

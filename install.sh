@@ -81,6 +81,18 @@ pre_flight_checks() {
     # Check for LXC container and verify unprivileged
     check_lxc_container
 
+    # Check for previous installation
+    if check_previous_installation; then
+        dialog --title "Previous Installation Detected" \
+            --yesno "A previous installation was detected.\n\nDate: ${INSTALL_DATE}\nWebserver: ${WEBSERVER}\nMariaDB: ${INSTALL_MARIADB}\nCertbot: ${INSTALL_CERTBOT}\n\nContinuing will skip already installed components.\n\nDo you want to continue?" \
+            15 70
+        if [[ $? -ne 0 ]]; then
+            clear
+            log "Installation cancelled by user"
+            exit 0
+        fi
+    fi
+
     # Setup locale (important for LXC containers)
     setup_locale
 
@@ -238,6 +250,14 @@ execute_installation() {
 finalize_installation() {
     log "Finalizing installation..."
 
+    # Save installation state
+    save_installation_state
+
+    # Save credentials if MariaDB was installed
+    if [[ "${INSTALL_MARIADB}" == "yes" ]]; then
+        save_credentials
+    fi
+
     # Create installation report
     create_installation_report
 
@@ -291,9 +311,13 @@ MariaDB: ${INSTALL_MARIADB:-no}
 EOF
 
     if [[ "${INSTALL_MARIADB}" == "yes" ]]; then
+        local mariadb_version
+        mariadb_version=$(mysql_cmd --version 2>/dev/null | awk '{print $5}' | sed 's/,//' || echo "unknown")
         cat >> "${report_file}" << EOF
+  - Version: ${mariadb_version}
   - Root Password: [CONFIGURED]
   - Host: ${DB_HOST}
+  - Credentials File: /root/.webhosting-credentials
 EOF
         if [[ "${CREATE_DATABASE}" == "yes" ]]; then
             cat >> "${report_file}" << EOF
@@ -343,10 +367,14 @@ EOF
 IMPORTANT FILES & DIRECTORIES
 -----------------------------------------------------------------
 
+Installation State: /root/.webhosting-installer-state
+Credentials Backup: /root/.webhosting-credentials (if MariaDB installed)
 Logs: ${LOG_DIR}/
 PHP-FPM Sockets: /run/php/
 PHP Configuration: /etc/php/*/fpm/
 Webserver Config: /etc/${WEBSERVER}/
+
+NOTE: You can re-run the installer. Already installed components will be skipped.
 
 =================================================================
 EOF

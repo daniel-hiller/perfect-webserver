@@ -348,7 +348,7 @@ EOF
         # Composer info
         if command -v composer &> /dev/null; then
             local composer_version
-            composer_version=$(composer --version 2>/dev/null | grep -oP 'Composer version \K[0-9.]+' || echo "installed")
+            composer_version=$(COMPOSER_ALLOW_SUPERUSER=1 composer --version 2>/dev/null | grep -oP 'Composer version \K[0-9.]+' || echo "installed")
             echo "  Composer: ${composer_version}" >> "${report_file}"
             echo "  Usage: composer install, composer require <package>" >> "${report_file}"
         fi

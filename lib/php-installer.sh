@@ -444,16 +444,25 @@ install_additional_php_extension() {
 install_composer() {
     log "Installing Composer (PHP dependency manager)..."
 
-    # Check if already installed
-    if command -v composer &> /dev/null; then
-        local current_version
-        current_version=$(composer --version 2>/dev/null | grep -oP 'Composer version \K[0-9.]+' || echo "unknown")
-        log "Composer is already installed (version: ${current_version})"
+    # Always export to prevent "Do not run as root" prompts
+    export COMPOSER_ALLOW_SUPERUSER=1
 
-        # Update to latest version
-        log "Updating Composer to latest version..."
-        COMPOSER_ALLOW_SUPERUSER=1 composer self-update || log "Warning: Failed to update Composer"
-        return 0
+    # Check if already installed and working
+    if command -v composer &> /dev/null; then
+        log "Composer binary found, checking if it works..."
+
+        # Test if composer actually works (with timeout)
+        if timeout 5 composer --version &> /dev/null 2>&1; then
+            log "Composer is already installed and working"
+
+            # Try to update (with timeout)
+            log "Updating Composer to latest version..."
+            timeout 30 composer self-update 2>&1 || log "Warning: Failed to update Composer"
+            return 0
+        else
+            log "Warning: Existing composer binary is broken, reinstalling..."
+            rm -f /usr/local/bin/composer
+        fi
     fi
 
     # Simple direct download method (most reliable)
@@ -467,15 +476,15 @@ install_composer() {
     # Set permissions
     chmod +x /usr/local/bin/composer
 
-    # Verify installation
-    if ! command -v composer &> /dev/null; then
-        log "ERROR: Composer installation failed"
+    # Verify installation works (with timeout)
+    if ! timeout 5 composer --version &> /dev/null 2>&1; then
+        log "ERROR: Composer installation failed or is not working"
         return 1
     fi
 
-    # Get version
+    # Get version (with timeout)
     local installed_version
-    installed_version=$(COMPOSER_ALLOW_SUPERUSER=1 composer --version 2>/dev/null | grep -oP 'Composer version \K[0-9.]+' || echo "unknown")
+    installed_version=$(timeout 5 composer --version 2>/dev/null | grep -oP 'Composer version \K[0-9.]+' || echo "installed")
     log "Composer installed successfully (version: ${installed_version})"
 
     log "Composer installation completed"

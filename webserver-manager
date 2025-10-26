@@ -273,7 +273,7 @@ system_update() {
     # Update Composer if installed
     if command -v composer &> /dev/null; then
         echo -e "${BLUE}Updating Composer...${NC}"
-        composer self-update || echo -e "${YELLOW}Warning: Failed to update Composer${NC}"
+        COMPOSER_ALLOW_SUPERUSER=1 composer self-update || echo -e "${YELLOW}Warning: Failed to update Composer${NC}"
     fi
 
     echo -e "${GREEN}✓ System updated successfully${NC}"

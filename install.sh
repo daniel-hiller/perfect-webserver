@@ -35,6 +35,7 @@ source "${LIB_DIR}/utils.sh"
 source "${LIB_DIR}/dialog-menus.sh"
 source "${LIB_DIR}/php-installer.sh"
 source "${LIB_DIR}/webserver-installer.sh"
+source "${LIB_DIR}/backup-installer.sh"
 source "${LIB_DIR}/database-installer.sh"
 source "${LIB_DIR}/certbot-installer.sh"
 
@@ -142,6 +143,12 @@ interactive_configuration() {
     # Configure Certbot
     configure_certbot_menu
 
+    # Configure PHP settings
+    configure_php_settings
+
+    # Configure Backups
+    configure_backup_menu
+
     # Show summary and confirm
     show_summary
 
@@ -176,6 +183,11 @@ execute_installation() {
             configure_php_ini "${version}"
             configure_php_fpm_pool "${version}"
             enable_php_fpm_service "${version}"
+        done
+
+        # Apply custom PHP settings if configured
+        for version in "${PHP_VERSIONS[@]}"; do
+            apply_custom_php_settings "${version}"
         done
 
         log "PHP installation completed"
@@ -232,9 +244,15 @@ execute_installation() {
     log "Phase 5: Firewall Configuration"
     configure_firewall
 
-    # Phase 6: Webserver Configuration Test
+    # Phase 6: Backup Configuration
+    if [[ "${CONFIGURE_BACKUP}" == "yes" ]]; then
+        log "Phase 6: Backup Configuration"
+        setup_automatic_backups
+    fi
+
+    # Phase 7: Webserver Configuration Test
     if [[ -n "${WEBSERVER}" ]]; then
-        log "Phase 6: Webserver Configuration Test"
+        log "Phase 7: Webserver Configuration Test"
         test_webserver_config
     fi
 
@@ -258,11 +276,11 @@ finalize_installation() {
         save_credentials
     fi
 
-    # Install PHP switcher tool
-    log "Installing PHP version switcher..."
-    cp "${SCRIPT_DIR}/switch-php" /usr/local/bin/switch-php
-    chmod +x /usr/local/bin/switch-php
-    log "PHP switcher installed: /usr/local/bin/switch-php"
+    # Install webserver manager tool
+    log "Installing webserver manager tool..."
+    cp "${SCRIPT_DIR}/webserver-manager" /usr/local/bin/webserver-manager
+    chmod +x /usr/local/bin/webserver-manager
+    log "Webserver manager installed: /usr/local/bin/webserver-manager"
 
     # Create installation report
     create_installation_report
@@ -308,9 +326,12 @@ EOF
             echo "  - PHP ${version} (FPM socket: /run/php/php${version}-fpm.sock)" >> "${report_file}"
         done
         echo "" >> "${report_file}"
-        echo "  Switch PHP version: switch-php switch <version>" >> "${report_file}"
-        echo "  Install new PHP version: switch-php install <version>" >> "${report_file}"
-        echo "  Show status: switch-php status" >> "${report_file}"
+        echo "" >> "${report_file}"
+        echo "  Management Tool: webserver-manager" >> "${report_file}"
+        echo "  - Switch PHP: webserver-manager php switch <version>" >> "${report_file}"
+        echo "  - Configure PHP: webserver-manager php config" >> "${report_file}"
+        echo "  - Create DB: webserver-manager db create" >> "${report_file}"
+        echo "  - Setup Backups: webserver-manager backup setup" >> "${report_file}"
     else
         echo "  - None" >> "${report_file}"
     fi

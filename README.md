@@ -107,14 +107,20 @@ Your selected PHP version is installed with FPM:
 # PHP-FPM Socket (example for PHP 8.3)
 /run/php/php8.3-fpm.sock
 
-# Switch to a different version anytime:
-switch-php switch 8.4
+# Webserver Manager - All-in-one management tool:
+webserver-manager php status              # Show PHP version
+webserver-manager php switch 8.4          # Switch PHP version
+webserver-manager php install 7.4         # Install new version
+webserver-manager php config              # Configure php.ini
 
-# Install a new version:
-switch-php install 7.4
+# Database Management:
+webserver-manager db create               # Create database/user
+webserver-manager db list                 # List databases
 
-# Check current status:
-switch-php status
+# System & Backups:
+webserver-manager system update           # Update system
+webserver-manager backup setup            # Configure backups
+webserver-manager backup now              # Run backup now
 \`\`\`
 
 **Installed PHP Extensions:**

@@ -1,0 +1,474 @@
+#!/bin/bash
+#
+# Perfect Webserver Manager
+# Copyright: Daniel Hiller
+# License: AGPL-3 or later
+#
+# All-in-one management tool for:
+# - PHP version switching
+# - PHP configuration (php.ini)
+# - Database management
+# - System updates
+# - Backups
+#
+
+set -euo pipefail
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Check root
+if [[ $EUID -ne 0 ]]; then
+   echo -e "${RED}This script must be run as root${NC}"
+   exit 1
+fi
+
+# ============================================================================
+# PHP MANAGEMENT
+# ============================================================================
+
+get_current_php() {
+    if [[ ! -f /etc/nginx/sites-enabled/default ]]; then
+        echo "unknown"
+        return
+    fi
+
+    local socket_path
+    socket_path=$(grep -oP 'unix:/run/php/php\K[0-9.]+' /etc/nginx/sites-enabled/default | head -1)
+    echo "${socket_path}"
+}
+
+get_installed_php() {
+    local versions=()
+    for service in /lib/systemd/system/php*-fpm.service; do
+        if [[ -f "$service" ]]; then
+            local version=$(basename "$service" | grep -oP 'php\K[0-9.]+')
+            if [[ -n "$version" ]]; then
+                versions+=("$version")
+            fi
+        fi
+    done
+    echo "${versions[@]}"
+}
+
+switch_php() {
+    local target_version="$1"
+    local current_version=$(get_current_php)
+
+    echo -e "${BLUE}Switching from PHP ${current_version} to PHP ${target_version}...${NC}"
+
+    if [[ ! -f "/lib/systemd/system/php${target_version}-fpm.service" ]]; then
+        echo -e "${RED}Error: PHP ${target_version} is not installed${NC}"
+        echo -e "${YELLOW}Install it first:${NC} webserver-manager php install ${target_version}"
+        exit 1
+    fi
+
+    local default_site="/etc/nginx/sites-available/default"
+    if [[ ! -f "$default_site" ]]; then
+        echo -e "${RED}Error: Nginx default site not found${NC}"
+        exit 1
+    fi
+
+    cp "$default_site" "$default_site.backup.$(date +%Y%m%d_%H%M%S)"
+    sed -i "s|unix:/run/php/php[0-9.]*-fpm.sock|unix:/run/php/php${target_version}-fpm.sock|g" "$default_site"
+
+    echo -e "${BLUE}Testing Nginx configuration...${NC}"
+    if ! nginx -t; then
+        echo -e "${RED}Nginx configuration test failed! Restoring backup...${NC}"
+        mv "$default_site.backup."* "$default_site"
+        exit 1
+    fi
+
+    systemctl reload nginx
+    systemctl enable "php${target_version}-fpm" 2>/dev/null || true
+    systemctl start "php${target_version}-fpm" 2>/dev/null || true
+
+    echo -e "${GREEN}✓ Successfully switched to PHP ${target_version}${NC}"
+}
+
+install_php() {
+    local version="$1"
+
+    echo -e "${BLUE}Installing PHP ${version}...${NC}"
+
+    if [[ ! -f /etc/apt/sources.list.d/php.list ]]; then
+        echo -e "${YELLOW}Adding Sury PHP repository...${NC}"
+        apt-get install -y lsb-release apt-transport-https ca-certificates wget
+        wget -q -O /tmp/php-sury.gpg https://packages.sury.org/php/apt.gpg
+        mv /tmp/php-sury.gpg /etc/apt/trusted.gpg.d/php.gpg
+        chmod 644 /etc/apt/trusted.gpg.d/php.gpg
+        echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/php.list
+        apt-get update -qq
+    fi
+
+    local packages=(
+        "php${version}-fpm"
+        "php${version}-cli"
+        "php${version}-common"
+        "php${version}-mysql"
+        "php${version}-curl"
+        "php${version}-gd"
+        "php${version}-mbstring"
+        "php${version}-xml"
+        "php${version}-zip"
+        "php${version}-intl"
+        "php${version}-bcmath"
+        "php${version}-opcache"
+    )
+
+    DEBIAN_FRONTEND=noninteractive apt-get install -y "${packages[@]}"
+    systemctl enable "php${version}-fpm"
+    systemctl start "php${version}-fpm"
+
+    echo -e "${GREEN}✓ PHP ${version} installed successfully${NC}"
+}
+
+php_status() {
+    local current=$(get_current_php)
+    local installed=$(get_installed_php)
+
+    echo -e "${CYAN}=== PHP Status ===${NC}\n"
+    echo -e "Current active version: ${GREEN}PHP $current${NC}"
+    echo -e "\nInstalled PHP-FPM versions:"
+
+    for version in $installed; do
+        local status=$(systemctl is-active "php${version}-fpm" 2>/dev/null || echo "inactive")
+        if [[ "$version" == "$current" ]]; then
+            echo -e "  ${GREEN}● PHP $version${NC} (active, $status)"
+        else
+            echo -e "  ${YELLOW}○ PHP $version${NC} ($status)"
+        fi
+    done
+    echo ""
+}
+
+configure_php_ini() {
+    local version=$(get_current_php)
+    if [[ "$version" == "unknown" ]]; then
+        echo -e "${RED}Error: No PHP version configured${NC}"
+        exit 1
+    fi
+
+    echo -e "${CYAN}=== Configure PHP ${version} ===${NC}\n"
+
+    local ini_file="/etc/php/${version}/fpm/php.ini"
+    if [[ ! -f "$ini_file" ]]; then
+        echo -e "${RED}Error: php.ini not found${NC}"
+        exit 1
+    fi
+
+    # Backup
+    cp "$ini_file" "$ini_file.backup.$(date +%Y%m%d_%H%M%S)"
+
+    # Interactive configuration
+    echo -e "${YELLOW}Current settings:${NC}"
+    echo "1. Upload Max Filesize: $(grep -P '^upload_max_filesize' $ini_file | cut -d= -f2 | tr -d ' ')"
+    echo "2. Post Max Size: $(grep -P '^post_max_size' $ini_file | cut -d= -f2 | tr -d ' ')"
+    echo "3. Max Execution Time: $(grep -P '^max_execution_time' $ini_file | cut -d= -f2 | tr -d ' ')"
+    echo "4. Memory Limit: $(grep -P '^memory_limit' $ini_file | cut -d= -f2 | tr -d ' ')"
+    echo "5. Timezone: $(grep -P '^date.timezone' $ini_file | cut -d= -f2 | tr -d ' ' || echo 'not set')"
+    echo ""
+
+    read -p "Upload Max Filesize (e.g., 64M) [Enter to skip]: " upload_max
+    read -p "Post Max Size (e.g., 64M) [Enter to skip]: " post_max
+    read -p "Max Execution Time (seconds) [Enter to skip]: " exec_time
+    read -p "Memory Limit (e.g., 256M) [Enter to skip]: " memory_limit
+    read -p "Timezone (e.g., Europe/Berlin) [Enter to skip]: " timezone
+
+    # Apply changes
+    [[ -n "$upload_max" ]] && sed -i "s/^upload_max_filesize.*/upload_max_filesize = $upload_max/" "$ini_file"
+    [[ -n "$post_max" ]] && sed -i "s/^post_max_size.*/post_max_size = $post_max/" "$ini_file"
+    [[ -n "$exec_time" ]] && sed -i "s/^max_execution_time.*/max_execution_time = $exec_time/" "$ini_file"
+    [[ -n "$memory_limit" ]] && sed -i "s/^memory_limit.*/memory_limit = $memory_limit/" "$ini_file"
+
+    if [[ -n "$timezone" ]]; then
+        if grep -q "^;date.timezone" "$ini_file"; then
+            sed -i "s|^;date.timezone.*|date.timezone = $timezone|" "$ini_file"
+        else
+            sed -i "s|^date.timezone.*|date.timezone = $timezone|" "$ini_file"
+        fi
+    fi
+
+    systemctl reload "php${version}-fpm"
+    echo -e "${GREEN}✓ PHP configuration updated and reloaded${NC}"
+}
+
+# ============================================================================
+# DATABASE MANAGEMENT
+# ============================================================================
+
+db_create() {
+    if ! command -v mariadb &> /dev/null && ! command -v mysql &> /dev/null; then
+        echo -e "${RED}Error: MariaDB is not installed${NC}"
+        exit 1
+    fi
+
+    echo -e "${CYAN}=== Create Database ===${NC}\n"
+
+    read -p "Database name: " db_name
+    read -p "Username: " db_user
+    read -sp "Password: " db_pass
+    echo ""
+
+    mysql_cmd -e "CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" || {
+        echo -e "${RED}Failed to create database${NC}"
+        exit 1
+    }
+
+    mysql_cmd -e "CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';" || {
+        echo -e "${RED}Failed to create user${NC}"
+        exit 1
+    }
+
+    mysql_cmd -e "GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost';"
+    mysql_cmd -e "FLUSH PRIVILEGES;"
+
+    echo -e "${GREEN}✓ Database created successfully${NC}"
+    echo -e "Database: ${db_name}"
+    echo -e "User: ${db_user}"
+    echo -e "Host: localhost"
+}
+
+db_list() {
+    if ! command -v mariadb &> /dev/null && ! command -v mysql &> /dev/null; then
+        echo -e "${RED}Error: MariaDB is not installed${NC}"
+        exit 1
+    fi
+
+    echo -e "${CYAN}=== Databases ===${NC}\n"
+    mysql_cmd -e "SHOW DATABASES;" | grep -v "Database\|information_schema\|performance_schema\|mysql\|sys"
+}
+
+mysql_cmd() {
+    if command -v mariadb &> /dev/null; then
+        mariadb "$@"
+    else
+        mysql "$@"
+    fi
+}
+
+# ============================================================================
+# SYSTEM MANAGEMENT
+# ============================================================================
+
+system_update() {
+    echo -e "${CYAN}=== System Update ===${NC}\n"
+
+    echo -e "${BLUE}Updating package lists...${NC}"
+    apt-get update
+
+    echo -e "${BLUE}Upgrading packages...${NC}"
+    apt-get upgrade -y
+
+    echo -e "${BLUE}Removing unused packages...${NC}"
+    apt-get autoremove -y
+    apt-get autoclean
+
+    echo -e "${GREEN}✓ System updated successfully${NC}"
+}
+
+# ============================================================================
+# BACKUP MANAGEMENT
+# ============================================================================
+
+setup_backups() {
+    echo -e "${CYAN}=== Setup Backups ===${NC}\n"
+
+    local backup_dir="/var/backups/webserver"
+    mkdir -p "$backup_dir"
+
+    # Get list of databases
+    local databases=()
+    if command -v mariadb &> /dev/null || command -v mysql &> /dev/null; then
+        echo -e "${BLUE}Available databases:${NC}"
+        mapfile -t databases < <(mysql_cmd -sNe "SHOW DATABASES;" | grep -v "information_schema\|performance_schema\|mysql\|sys")
+
+        local i=1
+        for db in "${databases[@]}"; do
+            echo "$i) $db"
+            ((i++))
+        done
+        echo ""
+
+        read -p "Select database number to backup (or 'all'): " db_choice
+
+        local selected_dbs=()
+        if [[ "$db_choice" == "all" ]]; then
+            selected_dbs=("${databases[@]}")
+        elif [[ "$db_choice" =~ ^[0-9]+$ ]] && [[ "$db_choice" -le "${#databases[@]}" ]]; then
+            selected_dbs=("${databases[$((db_choice-1))]}")
+        else
+            echo -e "${RED}Invalid selection${NC}"
+            exit 1
+        fi
+    fi
+
+    # Backup schedule
+    echo -e "\n${BLUE}Backup schedule options:${NC}"
+    echo "1) Daily at 2:00 AM"
+    echo "2) Daily at 3:00 AM"
+    echo "3) Weekly (Sunday 2:00 AM)"
+    echo "4) Custom cron expression"
+    read -p "Select option [1-4]: " schedule_choice
+
+    case $schedule_choice in
+        1) cron_expr="0 2 * * *" ;;
+        2) cron_expr="0 3 * * *" ;;
+        3) cron_expr="0 2 * * 0" ;;
+        4)
+            read -p "Enter cron expression: " cron_expr
+            ;;
+        *)
+            echo -e "${RED}Invalid option${NC}"
+            exit 1
+            ;;
+    esac
+
+    # Create backup script
+    local backup_script="/usr/local/bin/webserver-backup.sh"
+    cat > "$backup_script" << 'BACKUP_EOF'
+#!/bin/bash
+set -euo pipefail
+
+BACKUP_DIR="/var/backups/webserver"
+KEEP_DAYS=7
+DATE=$(date +%Y%m%d_%H%M%S)
+
+# Webroot backup
+tar -czf "${BACKUP_DIR}/webroot_${DATE}.tar.gz" -C /var/www html 2>/dev/null || true
+
+# Database backups
+BACKUP_EOF
+
+    for db in "${selected_dbs[@]}"; do
+        echo "mysqldump --single-transaction --quick --lock-tables=false \"$db\" | gzip > \"\${BACKUP_DIR}/db_${db}_\${DATE}.sql.gz\" 2>/dev/null || true" >> "$backup_script"
+    done
+
+    cat >> "$backup_script" << 'BACKUP_EOF'
+
+# Cleanup old backups
+find "${BACKUP_DIR}" -name "*.tar.gz" -mtime +${KEEP_DAYS} -delete 2>/dev/null || true
+find "${BACKUP_DIR}" -name "*.sql.gz" -mtime +${KEEP_DAYS} -delete 2>/dev/null || true
+
+echo "Backup completed: $(date)"
+BACKUP_EOF
+
+    chmod +x "$backup_script"
+
+    # Add to crontab
+    (crontab -l 2>/dev/null || true; echo "$cron_expr $backup_script >> /var/log/webserver-backup.log 2>&1") | crontab -
+
+    echo -e "${GREEN}✓ Backup configured successfully${NC}"
+    echo -e "Backup directory: $backup_dir"
+    echo -e "Schedule: $cron_expr"
+    echo -e "Log: /var/log/webserver-backup.log"
+    echo -e "\nTest backup now:"
+    echo -e "  $backup_script"
+}
+
+backup_now() {
+    if [[ -x /usr/local/bin/webserver-backup.sh ]]; then
+        /usr/local/bin/webserver-backup.sh
+    else
+        echo -e "${RED}Backup not configured. Run: webserver-manager backup setup${NC}"
+        exit 1
+    fi
+}
+
+list_backups() {
+    local backup_dir="/var/backups/webserver"
+    if [[ ! -d "$backup_dir" ]]; then
+        echo -e "${YELLOW}No backups found${NC}"
+        return
+    fi
+
+    echo -e "${CYAN}=== Available Backups ===${NC}\n"
+    ls -lh "$backup_dir" | grep -v "^total" || echo "No backups found"
+}
+
+# ============================================================================
+# MAIN MENU
+# ============================================================================
+
+show_help() {
+    cat << EOF
+${CYAN}Perfect Webserver Manager${NC}
+
+${YELLOW}PHP Management:${NC}
+  webserver-manager php status                    Show PHP version status
+  webserver-manager php switch <version>          Switch PHP version
+  webserver-manager php install <version>         Install new PHP version
+  webserver-manager php config                    Configure php.ini settings
+
+${YELLOW}Database Management:${NC}
+  webserver-manager db create                     Create database and user
+  webserver-manager db list                       List all databases
+
+${YELLOW}System Management:${NC}
+  webserver-manager system update                 Update system packages
+
+${YELLOW}Backup Management:${NC}
+  webserver-manager backup setup                  Configure automatic backups
+  webserver-manager backup now                    Run backup immediately
+  webserver-manager backup list                   List available backups
+
+${YELLOW}Examples:${NC}
+  webserver-manager php status
+  webserver-manager php switch 8.4
+  webserver-manager php config
+  webserver-manager db create
+  webserver-manager backup setup
+  webserver-manager system update
+
+EOF
+}
+
+# Main command router
+main() {
+    case "${1:-help}" in
+        php)
+            case "${2:-}" in
+                status) php_status ;;
+                switch) switch_php "${3:-}" ;;
+                install) install_php "${3:-}" ;;
+                config) configure_php_ini ;;
+                *) show_help ;;
+            esac
+            ;;
+        db)
+            case "${2:-}" in
+                create) db_create ;;
+                list) db_list ;;
+                *) show_help ;;
+            esac
+            ;;
+        system)
+            case "${2:-}" in
+                update) system_update ;;
+                *) show_help ;;
+            esac
+            ;;
+        backup)
+            case "${2:-}" in
+                setup) setup_backups ;;
+                now) backup_now ;;
+                list) list_backups ;;
+                *) show_help ;;
+            esac
+            ;;
+        help|--help|-h)
+            show_help
+            ;;
+        *)
+            show_help
+            ;;
+    esac
+}
+
+main "$@"

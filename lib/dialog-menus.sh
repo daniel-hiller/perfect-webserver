@@ -260,6 +260,104 @@ Recommended: Yes" 18 65; then
 }
 
 # ============================================================================
+# PHP CONFIGURATION
+# ============================================================================
+
+# configure_php_settings: Configure PHP.ini settings
+configure_php_settings() {
+    if dialog --title "PHP Configuration" \
+        --yesno "Do you want to configure PHP settings now?\n\n\
+You can configure:\n\
+  • Upload max filesize\n\
+  • Memory limit\n\
+  • Execution time\n\
+  • Timezone\n\n\
+You can change these later with:\nwebserver-manager php config\n\n\
+Configure now?" 17 65; then
+
+        # Get current defaults or use sensible defaults
+        local upload_max="64M"
+        local memory_limit="256M"
+        local exec_time="300"
+        local timezone="Europe/Berlin"
+
+        # Upload size
+        upload_max=$(dialog --stdout --title "Upload Max Filesize" \
+            --inputbox "Maximum file upload size:\n\n(e.g., 64M, 128M, 256M)" 10 50 "${upload_max}")
+
+        # Memory limit
+        memory_limit=$(dialog --stdout --title "Memory Limit" \
+            --inputbox "PHP memory limit:\n\n(e.g., 128M, 256M, 512M)" 10 50 "${memory_limit}")
+
+        # Execution time
+        exec_time=$(dialog --stdout --title "Max Execution Time" \
+            --inputbox "Maximum execution time in seconds:\n\n(e.g., 30, 60, 300)" 10 50 "${exec_time}")
+
+        # Timezone
+        timezone=$(dialog --stdout --title "Timezone" \
+            --inputbox "PHP timezone:\n\n(e.g., Europe/Berlin, America/New_York, UTC)" 10 60 "${timezone}")
+
+        # Save settings
+        PHP_UPLOAD_MAX="${upload_max}"
+        PHP_MEMORY_LIMIT="${memory_limit}"
+        PHP_EXEC_TIME="${exec_time}"
+        PHP_TIMEZONE="${timezone}"
+
+        log "PHP settings configured: upload=${upload_max}, memory=${memory_limit}, time=${exec_time}, tz=${timezone}"
+    else
+        log "PHP configuration skipped (will use defaults)"
+    fi
+
+    clear
+}
+
+# ============================================================================
+# BACKUP CONFIGURATION
+# ============================================================================
+
+# configure_backup_menu: Setup automatic backups
+configure_backup_menu() {
+    if dialog --title "Automatic Backups" \
+        --yesno "Do you want to setup automatic backups?\n\n\
+Backups include:\n\
+  • Website files (/var/www/html)\n\
+  • Database(s) (if MariaDB installed)\n\
+  • 7-day retention\n\n\
+You can configure this later with:\nwebserver-manager backup setup\n\n\
+Setup now?" 17 65; then
+
+        CONFIGURE_BACKUP="yes"
+
+        # Backup schedule
+        local schedule=$(dialog --stdout --title "Backup Schedule" \
+            --menu "When should backups run?" 15 60 4 \
+            "1" "Daily at 2:00 AM (Recommended)" \
+            "2" "Daily at 3:00 AM" \
+            "3" "Weekly (Sunday 2:00 AM)" \
+            "4" "Skip - Configure later")
+
+        case $schedule in
+            1) BACKUP_SCHEDULE="0 2 * * *" ;;
+            2) BACKUP_SCHEDULE="0 3 * * *" ;;
+            3) BACKUP_SCHEDULE="0 2 * * 0" ;;
+            4)
+                CONFIGURE_BACKUP="no"
+                log "Backup configuration skipped"
+                ;;
+        esac
+
+        if [[ "${CONFIGURE_BACKUP}" == "yes" ]]; then
+            log "Backup configured: ${BACKUP_SCHEDULE}"
+        fi
+    else
+        CONFIGURE_BACKUP="no"
+        log "Backup configuration skipped"
+    fi
+
+    clear
+}
+
+# ============================================================================
 # SUMMARY AND CONFIRMATION
 # ============================================================================
 

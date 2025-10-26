@@ -173,6 +173,65 @@ configure_php_ini() {
     log "php.ini configuration completed for PHP ${version}"
 }
 
+# apply_custom_php_settings: Apply user-configured PHP settings
+# Uses global variables from dialog: PHP_UPLOAD_MAX, PHP_MEMORY_LIMIT, PHP_EXEC_TIME, PHP_TIMEZONE
+apply_custom_php_settings() {
+    local version="$1"
+
+    if [[ -z "${version}" ]]; then
+        error_exit "PHP version not specified for custom settings"
+    fi
+
+    # Only apply if settings were configured
+    if [[ -z "${PHP_UPLOAD_MAX:-}" ]]; then
+        log "No custom PHP settings configured, skipping..."
+        return 0
+    fi
+
+    log "Applying custom PHP settings for PHP ${version}..."
+
+    local ini_file="/etc/php/${version}/fpm/php.ini"
+
+    if [[ ! -f "${ini_file}" ]]; then
+        log "Warning: php.ini not found: ${ini_file}"
+        return 1
+    fi
+
+    # Backup
+    cp "${ini_file}" "${ini_file}.backup.$(date +%Y%m%d_%H%M%S)"
+
+    # Apply upload max
+    if [[ -n "${PHP_UPLOAD_MAX:-}" ]]; then
+        sed -i "s/^upload_max_filesize.*/upload_max_filesize = ${PHP_UPLOAD_MAX}/" "${ini_file}"
+        sed -i "s/^post_max_size.*/post_max_size = ${PHP_UPLOAD_MAX}/" "${ini_file}"
+        log "Set upload_max_filesize and post_max_size to ${PHP_UPLOAD_MAX}"
+    fi
+
+    # Apply memory limit
+    if [[ -n "${PHP_MEMORY_LIMIT:-}" ]]; then
+        sed -i "s/^memory_limit.*/memory_limit = ${PHP_MEMORY_LIMIT}/" "${ini_file}"
+        log "Set memory_limit to ${PHP_MEMORY_LIMIT}"
+    fi
+
+    # Apply execution time
+    if [[ -n "${PHP_EXEC_TIME:-}" ]]; then
+        sed -i "s/^max_execution_time.*/max_execution_time = ${PHP_EXEC_TIME}/" "${ini_file}"
+        log "Set max_execution_time to ${PHP_EXEC_TIME}"
+    fi
+
+    # Apply timezone
+    if [[ -n "${PHP_TIMEZONE:-}" ]]; then
+        if grep -q "^;date.timezone" "${ini_file}"; then
+            sed -i "s|^;date.timezone.*|date.timezone = ${PHP_TIMEZONE}|" "${ini_file}"
+        else
+            sed -i "s|^date.timezone.*|date.timezone = ${PHP_TIMEZONE}|" "${ini_file}"
+        fi
+        log "Set date.timezone to ${PHP_TIMEZONE}"
+    fi
+
+    log "Custom PHP settings applied successfully"
+}
+
 # ============================================================================
 # PHP-FPM POOL CONFIGURATION
 # ============================================================================

@@ -456,44 +456,16 @@ install_composer() {
         return 0
     fi
 
-    # Method based on official Composer documentation
-    # https://getcomposer.org/doc/faqs/how-to-install-composer-programmatically.md
+    # Simple direct download method (most reliable)
+    log "Downloading Composer directly from official source..."
 
-    log "Downloading Composer installer..."
-
-    # Get expected checksum
-    local expected_checksum
-    expected_checksum=$(php -r 'copy("https://composer.github.io/installer.sig", "php://stdout");')
-
-    # Download installer
-    php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php');"
-
-    # Verify checksum
-    local actual_checksum
-    actual_checksum=$(php -r "echo hash_file('sha384', '/tmp/composer-setup.php');")
-
-    if [[ "${expected_checksum}" != "${actual_checksum}" ]]; then
-        log "ERROR: Invalid Composer installer checksum"
-        log "Expected: ${expected_checksum}"
-        log "Actual:   ${actual_checksum}"
-        rm -f /tmp/composer-setup.php
-
-        # Fallback: Direct download of composer.phar
-        log "Falling back to direct download..."
-        wget -q -O /usr/local/bin/composer https://getcomposer.org/download/latest-stable/composer.phar
-        chmod +x /usr/local/bin/composer
-    else
-        # Install Composer
-        log "Installing Composer globally..."
-        COMPOSER_ALLOW_SUPERUSER=1 php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
-        local result=$?
-        rm -f /tmp/composer-setup.php
-
-        if [[ $result -ne 0 ]]; then
-            log "Warning: Composer installer returned error code ${result}"
-            return 1
-        fi
+    if ! wget --timeout=30 -q -O /usr/local/bin/composer https://getcomposer.org/download/latest-stable/composer.phar; then
+        log "ERROR: Failed to download Composer"
+        return 1
     fi
+
+    # Set permissions
+    chmod +x /usr/local/bin/composer
 
     # Verify installation
     if ! command -v composer &> /dev/null; then
@@ -501,9 +473,7 @@ install_composer() {
         return 1
     fi
 
-    # Set permissions
-    chmod +x /usr/local/bin/composer
-
+    # Get version
     local installed_version
     installed_version=$(COMPOSER_ALLOW_SUPERUSER=1 composer --version 2>/dev/null | grep -oP 'Composer version \K[0-9.]+' || echo "unknown")
     log "Composer installed successfully (version: ${installed_version})"

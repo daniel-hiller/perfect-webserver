@@ -18,19 +18,6 @@
         }
     </script>
     <style>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#667eea',
-                        secondary: '#764ba2',
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
         @keyframes slideInUp {
             from {
                 opacity: 0;

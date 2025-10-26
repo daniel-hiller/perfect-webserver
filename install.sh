@@ -75,8 +75,8 @@ pre_flight_checks() {
     # Check root privileges
     check_root
 
-    # Verify Debian 13
-    check_debian_13
+    # Verify supported OS (Debian 12/13, Ubuntu 22.04/24.04)
+    check_supported_os
 
     # Check for LXC container and verify unprivileged
     check_lxc_container
@@ -130,11 +130,11 @@ interactive_configuration() {
     # Welcome screen
     show_welcome
 
-    # Select webserver
+    # Select webserver (Nginx only)
     select_webserver
 
-    # Select PHP versions
-    select_php_versions
+    # Select PHP version (single version)
+    select_php_version
 
     # Configure MariaDB
     configure_mariadb_menu
@@ -258,6 +258,12 @@ finalize_installation() {
         save_credentials
     fi
 
+    # Install PHP switcher tool
+    log "Installing PHP version switcher..."
+    cp "${SCRIPT_DIR}/switch-php" /usr/local/bin/switch-php
+    chmod +x /usr/local/bin/switch-php
+    log "PHP switcher installed: /usr/local/bin/switch-php"
+
     # Create installation report
     create_installation_report
 
@@ -301,6 +307,10 @@ EOF
         for version in "${PHP_VERSIONS[@]}"; do
             echo "  - PHP ${version} (FPM socket: /run/php/php${version}-fpm.sock)" >> "${report_file}"
         done
+        echo "" >> "${report_file}"
+        echo "  Switch PHP version: switch-php switch <version>" >> "${report_file}"
+        echo "  Install new PHP version: switch-php install <version>" >> "${report_file}"
+        echo "  Show status: switch-php status" >> "${report_file}"
     else
         echo "  - None" >> "${report_file}"
     fi

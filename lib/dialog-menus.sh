@@ -31,21 +31,15 @@ Press OK to continue." \
 # WEBSERVER SELECTION
 # ============================================================================
 
-# select_webserver: Choose between Nginx and Apache
+# select_webserver: Set webserver to Nginx (Apache support removed)
 select_webserver() {
-    local choice
+    WEBSERVER="nginx"
+    log "Webserver: Nginx (high-performance, modern)"
 
-    choice=$(dialog --stdout --title "Webserver Selection" \
-        --menu "Please select a webserver:" 15 60 2 \
-        "nginx" "Nginx (Recommended, lightweight)" \
-        "apache" "Apache (Classic, .htaccess support)")
+    dialog --title "Web Server" \
+        --msgbox "This installer uses Nginx as the web server.\n\nNginx is a modern, high-performance web server that is:\n- Faster and more efficient than Apache\n- Better suited for hosting single sites\n- Industry standard for modern web applications" \
+        12 65
 
-    if [[ -z "${choice}" ]]; then
-        error_exit "Installation cancelled: No webserver selected"
-    fi
-
-    WEBSERVER="${choice}"
-    log "Webserver selected: ${WEBSERVER}"
     clear
 }
 
@@ -53,40 +47,31 @@ select_webserver() {
 # PHP VERSION SELECTION
 # ============================================================================
 
-# select_php_versions: Multi-select PHP versions
-select_php_versions() {
-    local selected
+# select_php_version: Select single PHP version
+select_php_version() {
+    local choice
 
-    selected=$(dialog --stdout --separate-output \
-        --title "PHP Versions" \
-        --checklist "Select PHP versions (SPACE to select, ENTER to confirm):\n\n\
-Multiple selection possible - all versions run in parallel via PHP-FPM." \
-        22 75 11 \
-        "5.6" "PHP 5.6 (EOL - Legacy Support)" OFF \
-        "7.0" "PHP 7.0 (EOL - Legacy Support)" OFF \
-        "7.1" "PHP 7.1 (EOL - Legacy Support)" OFF \
-        "7.2" "PHP 7.2 (EOL - Legacy Support)" OFF \
-        "7.3" "PHP 7.3 (EOL - Legacy Support)" OFF \
-        "7.4" "PHP 7.4 (EOL - Legacy Support)" OFF \
-        "8.0" "PHP 8.0 (Security Support)" OFF \
-        "8.1" "PHP 8.1 (Security Support)" OFF \
-        "8.2" "PHP 8.2 (Active Support)" ON \
-        "8.3" "PHP 8.3 (Recommended)" ON \
-        "8.4" "PHP 8.4 (Latest)" OFF)
+    choice=$(dialog --stdout --title "PHP Version Selection" \
+        --menu "Select ONE PHP version for your site:\n\nYou can switch versions later using the switch-php tool." \
+        20 70 11 \
+        "5.6" "PHP 5.6 (EOL - Legacy Only)" \
+        "7.0" "PHP 7.0 (EOL - Legacy Only)" \
+        "7.1" "PHP 7.1 (EOL - Legacy Only)" \
+        "7.2" "PHP 7.2 (EOL - Legacy Only)" \
+        "7.3" "PHP 7.3 (EOL - Legacy Only)" \
+        "7.4" "PHP 7.4 (EOL - Legacy Only)" \
+        "8.0" "PHP 8.0 (Security Support)" \
+        "8.1" "PHP 8.1 (Security Support)" \
+        "8.2" "PHP 8.2 (Active Support)" \
+        "8.3" "PHP 8.3 (Recommended)" \
+        "8.4" "PHP 8.4 (Latest)")
 
-    if [[ -z "${selected}" ]]; then
-        if dialog --title "Warning" \
-            --yesno "No PHP version selected.\n\nDo you want to continue without PHP?" 10 50; then
-            log "No PHP versions selected (user confirmed)"
-        else
-            select_php_versions
-            return
-        fi
-    else
-        # Convert newline-separated list to array
-        mapfile -t PHP_VERSIONS <<< "${selected}"
-        log "PHP versions selected: ${PHP_VERSIONS[*]}"
+    if [[ -z "${choice}" ]]; then
+        error_exit "Installation cancelled: No PHP version selected"
     fi
+
+    PHP_VERSIONS=("${choice}")
+    log "PHP version selected: ${choice}"
 
     clear
 }

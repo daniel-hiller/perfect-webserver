@@ -4,7 +4,7 @@
 # Copyright: Daniel Hiller
 # License: AGPL-3 or later
 #
-# Nginx and Apache installation with PHP-FPM integration
+# Nginx installation with PHP-FPM integration
 #
 
 # ============================================================================
@@ -305,179 +305,6 @@ install_error_pages() {
 }
 
 # ============================================================================
-# APACHE INSTALLATION
-# ============================================================================
-
-# install_apache: Install and configure Apache webserver
-install_apache() {
-    log "Installing Apache webserver..."
-
-    # Check if already installed
-    if command -v apache2 &> /dev/null && systemctl is-active --quiet apache2; then
-        log "Apache is already installed and running"
-        log "Skipping Apache installation..."
-        return 0
-    fi
-
-    # Install Apache
-    install_package "apache2"
-
-    # Create directories
-    mkdir -p /var/www/html
-
-    # Backup original configuration
-    backup_file "/etc/apache2/apache2.conf"
-
-    # Configure Apache main config
-    configure_apache_main
-
-    # Enable required modules
-    enable_apache_modules
-
-    # Create PHP-FPM proxy configurations
-    create_apache_php_configs
-
-    # Create default virtual host
-    create_apache_default_vhost
-
-    # Install custom error pages
-    install_error_pages
-
-    # Disable default SSL site (if present)
-    [[ -f /etc/apache2/sites-enabled/default-ssl.conf ]] && a2dissite default-ssl
-
-    # Test configuration
-    apache2ctl configtest || error_exit "Apache configuration test failed"
-
-    # Enable and start Apache
-    enable_service "apache2"
-
-    # Create default index page
-    create_default_index_page
-
-    log "Apache installation completed successfully"
-}
-
-# configure_apache_main: Configure main Apache settings
-configure_apache_main() {
-    log "Configuring Apache main configuration..."
-
-    local apache_conf="/etc/apache2/apache2.conf"
-
-    # Set ServerTokens and ServerSignature
-    if ! grep -q "^ServerTokens" /etc/apache2/conf-available/security.conf; then
-        echo "ServerTokens Prod" >> /etc/apache2/conf-available/security.conf
-    else
-        sed -i 's/^ServerTokens .*/ServerTokens Prod/' /etc/apache2/conf-available/security.conf
-    fi
-
-    if ! grep -q "^ServerSignature" /etc/apache2/conf-available/security.conf; then
-        echo "ServerSignature Off" >> /etc/apache2/conf-available/security.conf
-    else
-        sed -i 's/^ServerSignature .*/ServerSignature Off/' /etc/apache2/conf-available/security.conf
-    fi
-
-    # Enable security conf
-    a2enconf security
-
-    log "Apache main configuration updated"
-}
-
-# enable_apache_modules: Enable required Apache modules
-enable_apache_modules() {
-    log "Enabling Apache modules..."
-
-    local modules=(
-        "rewrite"
-        "ssl"
-        "headers"
-        "proxy"
-        "proxy_fcgi"
-        "setenvif"
-    )
-
-    for module in "${modules[@]}"; do
-        log "Enabling module: ${module}"
-        a2enmod "${module}" || log "Warning: Failed to enable module ${module}"
-    done
-
-    log "Apache modules enabled"
-}
-
-# create_apache_php_configs: Create PHP-FPM proxy configurations
-create_apache_php_configs() {
-    log "Creating Apache PHP-FPM configurations..."
-
-    local config_dir="/etc/apache2/conf-available"
-
-    # Create config for each PHP version
-    for version in "${PHP_VERSIONS[@]}"; do
-        local socket_path
-        socket_path=$(get_php_fpm_socket "${version}")
-        local config_file="${config_dir}/php${version}-fpm.conf"
-
-        cat > "${config_file}" << EOF
-# PHP ${version} FPM Configuration
-<FilesMatch \.php\$>
-    SetHandler "proxy:unix:${socket_path}|fcgi://localhost"
-</FilesMatch>
-EOF
-
-        log "Created PHP ${version} config: ${config_file}"
-    done
-
-    # Enable default PHP version config
-    local default_php="${PHP_VERSIONS[-1]}"
-    a2enconf "php${default_php}-fpm"
-
-    log "Apache PHP-FPM configurations created (default: ${default_php})"
-}
-
-# create_apache_default_vhost: Create default virtual host
-create_apache_default_vhost() {
-    log "Creating Apache default virtual host..."
-
-    local vhost_file="/etc/apache2/sites-available/000-default.conf"
-
-    cat > "${vhost_file}" << 'EOF'
-<VirtualHost *:80>
-    ServerAdmin webmaster@localhost
-    DocumentRoot /var/www/html
-
-    <Directory /var/www/html>
-        Options -Indexes +FollowSymLinks
-        AllowOverride All
-        Require all granted
-    </Directory>
-
-    # Custom error pages
-    ErrorDocument 403 /errors/403.html
-    ErrorDocument 404 /errors/404.html
-    ErrorDocument 500 /errors/500.html
-    ErrorDocument 502 /errors/502.html
-    ErrorDocument 503 /errors/503.html
-
-    <Directory /var/www/errors>
-        Require all granted
-    </Directory>
-
-    # Security headers
-    Header always set X-Frame-Options "SAMEORIGIN"
-    Header always set X-Content-Type-Options "nosniff"
-    Header always set X-XSS-Protection "1; mode=block"
-
-    ErrorLog ${APACHE_LOG_DIR}/error.log
-    CustomLog ${APACHE_LOG_DIR}/access.log combined
-</VirtualHost>
-EOF
-
-    # Enable site
-    a2ensite 000-default
-
-    log "Apache default virtual host created"
-}
-
-# ============================================================================
 # FIREWALL CONFIGURATION
 # ============================================================================
 
@@ -520,26 +347,15 @@ configure_firewall() {
 # WEBSERVER TESTING
 # ============================================================================
 
-# test_webserver_config: Test webserver configuration
+# test_webserver_config: Test Nginx configuration
 test_webserver_config() {
-    log "Testing webserver configuration..."
+    log "Testing Nginx configuration..."
 
-    if [[ "${WEBSERVER}" == "nginx" ]]; then
-        log "Testing Nginx configuration..."
-        nginx -t || error_exit "Nginx configuration test failed"
-        log "Nginx configuration test passed"
+    nginx -t || error_exit "Nginx configuration test failed"
+    log "Nginx configuration test passed"
 
-        # Reload to apply any changes
-        reload_service "nginx"
-
-    elif [[ "${WEBSERVER}" == "apache" ]]; then
-        log "Testing Apache configuration..."
-        apache2ctl configtest || error_exit "Apache configuration test failed"
-        log "Apache configuration test passed"
-
-        # Reload to apply any changes
-        reload_service "apache2"
-    fi
+    # Reload to apply any changes
+    reload_service "nginx"
 
     log "Webserver configuration test completed"
 }
@@ -556,12 +372,8 @@ get_installation_info() {
         "components")
             local components=""
             
-            # Webserver
-            if [[ "${WEBSERVER}" == "nginx" ]]; then
-                components+='<div class="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border-l-4 border-purple-600 hover:scale-105"><div class="flex items-center gap-3 mb-2"><span class="text-3xl">🚀</span><span class="text-lg font-bold text-gray-800">Nginx</span></div><div class="text-gray-600 text-sm">High-performance web server</div></div>'
-            elif [[ "${WEBSERVER}" == "apache" ]]; then
-                components+='<div class="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border-l-4 border-purple-600 hover:scale-105"><div class="flex items-center gap-3 mb-2"><span class="text-3xl">🚀</span><span class="text-lg font-bold text-gray-800">Apache</span></div><div class="text-gray-600 text-sm">Reliable web server</div></div>'
-            fi
+            # Webserver (Nginx only)
+            components+='<div class="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border-l-4 border-purple-600 hover:scale-105"><div class="flex items-center gap-3 mb-2"><span class="text-3xl">🚀</span><span class="text-lg font-bold text-gray-800">Nginx</span></div><div class="text-gray-600 text-sm">High-performance web server</div></div>'
             
             # PHP
             if [[ ${#PHP_VERSIONS[@]} -gt 0 ]]; then
@@ -569,7 +381,7 @@ get_installation_info() {
             fi
             
             # Database
-            if command -v mysql &> /dev/null; then
+            if command -v mariadb &> /dev/null || command -v mysql &> /dev/null; then
                 components+='<div class="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border-l-4 border-blue-600 hover:scale-105"><div class="flex items-center gap-3 mb-2"><span class="text-3xl">🗄️</span><span class="text-lg font-bold text-gray-800">MariaDB</span></div><div class="text-gray-600 text-sm">Database server</div></div>'
             fi
             
@@ -603,26 +415,20 @@ get_installation_info() {
             ;;
             
         "mariadb_info")
-            if command -v mysql &> /dev/null; then
+            if command -v mariadb &> /dev/null || command -v mysql &> /dev/null; then
                 local pw_file="/root/.webhosting-credentials"
-                echo '<div class="mb-10"><h2 class="text-3xl font-bold text-gray-800 mb-6 flex items-center"><svg class="w-8 h-8 mr-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>Database Credentials</h2><div class="bg-gradient-to-r from-red-50 to-pink-50 border-l-4 border-red-500 rounded-xl p-6"><div class="flex items-start"><svg class="w-6 h-6 text-red-500 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg><div><h3 class="text-lg font-bold text-red-800 mb-3">Important: Database Passwords</h3><p class="text-gray-700 mb-4">Your MariaDB root password and other database credentials have been saved to:</p><div class="bg-gray-800 text-green-400 px-4 py-3 rounded-lg font-mono text-sm mb-4">/root/.webhosting-credentials</div><div class="bg-white border border-red-200 rounded-lg p-4 mb-4"><p class="text-sm text-gray-700"><strong class="text-red-700">⚠️ Security:</strong> This file contains sensitive information and is only readable by root. Please store these credentials in a secure password manager and consider removing this file after noting the passwords.</p></div><p class="text-gray-700"><strong>Access MariaDB:</strong> <code class="bg-gray-800 text-green-400 px-2 py-1 rounded text-sm">mysql -u root -p</code></p></div></div></div></div>'
+                echo '<div class="mb-10"><h2 class="text-3xl font-bold text-gray-800 mb-6 flex items-center"><svg class="w-8 h-8 mr-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>Database Credentials</h2><div class="bg-gradient-to-r from-red-50 to-pink-50 border-l-4 border-red-500 rounded-xl p-6"><div class="flex items-start"><svg class="w-6 h-6 text-red-500 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg><div><h3 class="text-lg font-bold text-red-800 mb-3">Important: Database Passwords</h3><p class="text-gray-700 mb-4">Your MariaDB root password and other database credentials have been saved to:</p><div class="bg-gray-800 text-green-400 px-4 py-3 rounded-lg font-mono text-sm mb-4">/root/.webhosting-credentials</div><div class="bg-white border border-red-200 rounded-lg p-4 mb-4"><p class="text-sm text-gray-700"><strong class="text-red-700">⚠️ Security:</strong> This file contains sensitive information and is only readable by root. Please store these credentials in a secure password manager and consider removing this file after noting the passwords.</p></div><p class="text-gray-700"><strong>Access MariaDB:</strong> <code class="bg-gray-800 text-green-400 px-2 py-1 rounded text-sm">mariadb -u root -p</code></p></div></div></div></div>'
             else
                 echo ""
             fi
             ;;
             
         "webserver_config")
-            if [[ "${WEBSERVER}" == "nginx" ]]; then
-                echo "/etc/nginx/nginx.conf"
-            elif [[ "${WEBSERVER}" == "apache" ]]; then
-                echo "/etc/apache2/apache2.conf"
-            else
-                echo "N/A"
-            fi
+            echo "/etc/nginx/nginx.conf"
             ;;
             
         "database_config")
-            if command -v mysql &> /dev/null; then
+            if command -v mariadb &> /dev/null || command -v mysql &> /dev/null; then
                 echo '<div class="mt-4"><p class="font-semibold text-gray-700 mb-2">Database Config:</p><div class="bg-gray-800 text-green-400 px-4 py-3 rounded-lg font-mono text-sm">/etc/mysql/mariadb.conf.d/</div></div>'
             else
                 echo ""
@@ -630,10 +436,9 @@ get_installation_info() {
             ;;
             
         "component_count")
-            local count=0
-            [[ "${WEBSERVER}" == "nginx" || "${WEBSERVER}" == "apache" ]] && ((count++))
+            local count=1  # Nginx is always installed
             [[ ${#PHP_VERSIONS[@]} -gt 0 ]] && ((count++))
-            command -v mysql &> /dev/null && ((count++))
+            { command -v mariadb &> /dev/null || command -v mysql &> /dev/null; } && ((count++))
             command -v certbot &> /dev/null && ((count++))
             command -v ufw &> /dev/null && ((count++))
             echo "${count}"
@@ -644,13 +449,7 @@ get_installation_info() {
             ;;
             
         "webserver_name")
-            if [[ "${WEBSERVER}" == "nginx" ]]; then
-                echo "Nginx"
-            elif [[ "${WEBSERVER}" == "apache" ]]; then
-                echo "Apache"
-            else
-                echo "N/A"
-            fi
+            echo "Nginx"
             ;;
     esac
 }
@@ -660,7 +459,7 @@ create_default_index_page() {
     log "Creating default web pages..."
 
     local webroot="/var/www/html"
-    local template_file="${SCRIPT_DIR}/../config/templates/default-index.html.template"
+    local template_file="${CONFIG_DIR}/templates/default-index.html.template"
     
     # Check if template exists
     if [[ ! -f "${template_file}" ]]; then
@@ -748,22 +547,14 @@ EOF
 # UTILITY FUNCTIONS
 # ============================================================================
 
-# get_webserver_status: Get webserver status
+# get_webserver_status: Get Nginx status
 get_webserver_status() {
-    if [[ "${WEBSERVER}" == "nginx" ]]; then
-        systemctl status nginx --no-pager
-    elif [[ "${WEBSERVER}" == "apache" ]]; then
-        systemctl status apache2 --no-pager
-    fi
+    systemctl status nginx --no-pager
 }
 
-# reload_webserver: Reload webserver configuration
+# reload_webserver: Reload Nginx configuration
 reload_webserver() {
-    if [[ "${WEBSERVER}" == "nginx" ]]; then
-        reload_service "nginx"
-    elif [[ "${WEBSERVER}" == "apache" ]]; then
-        reload_service "apache2"
-    fi
+    reload_service "nginx"
 }
 
 # ============================================================================

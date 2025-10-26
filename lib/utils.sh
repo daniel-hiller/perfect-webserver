@@ -57,9 +57,9 @@ check_root() {
     log "Root privileges verified"
 }
 
-# check_debian_13: Verify system is running Debian 13 (Trixie)
-# Exit if not Debian 13
-check_debian_13() {
+# check_supported_os: Verify system is running a supported OS
+# Supported: Debian 12/13, Ubuntu 22.04/24.04 LTS
+check_supported_os() {
     # Check if /etc/os-release exists
     if [[ ! -f /etc/os-release ]]; then
         error_exit "Cannot determine OS version: /etc/os-release not found"
@@ -68,22 +68,39 @@ check_debian_13() {
     # Source OS information
     source /etc/os-release
 
-    # Check if Debian
-    if [[ "${ID}" != "debian" ]]; then
-        error_exit "This installer only supports Debian. Detected: ${NAME}"
-    fi
+    local os_name="${ID}"
+    local os_version="${VERSION_ID}"
+    local os_supported=false
 
-    # Check version (Debian 13 = Trixie)
-    local version_id="${VERSION_ID:-0}"
-    if [[ "${version_id}" != "13" ]]; then
-        # Also check codename
-        if [[ "${VERSION_CODENAME}" != "trixie" ]]; then
-            error_exit "This installer requires Debian 13 (Trixie). Detected: ${VERSION}"
+    # Check Debian
+    if [[ "${os_name}" == "debian" ]]; then
+        if [[ "${os_version}" == "12" ]]; then
+            log "Debian 12 (Bookworm) detected and supported"
+            os_supported=true
+        elif [[ "${os_version}" == "13" ]]; then
+            log "Debian 13 (Trixie) detected and supported"
+            os_supported=true
+        fi
+    # Check Ubuntu
+    elif [[ "${os_name}" == "ubuntu" ]]; then
+        if [[ "${os_version}" == "22.04" ]]; then
+            log "Ubuntu 22.04 LTS (Jammy) detected and supported"
+            os_supported=true
+        elif [[ "${os_version}" == "24.04" ]]; then
+            log "Ubuntu 24.04 LTS (Noble) detected and supported"
+            os_supported=true
         fi
     fi
 
-    DEBIAN_VERSION="${VERSION_ID}"
-    log "Debian 13 (Trixie) verified"
+    # Exit if not supported
+    if [[ "${os_supported}" != "true" ]]; then
+        error_exit "Unsupported OS detected: ${NAME} ${VERSION}\n\nSupported:\n- Debian 12 (Bookworm)\n- Debian 13 (Trixie)\n- Ubuntu 22.04 LTS\n- Ubuntu 24.04 LTS"
+    fi
+
+    # Set global variables
+    DEBIAN_VERSION="${os_version}"
+    OS_NAME="${os_name}"
+    OS_VERSION="${os_version}"
 }
 
 # check_lxc_container: Verify LXC container is unprivileged

@@ -1,23 +1,26 @@
-# Webhosting VM/LXC Installer for Debian 13
+# Perfect Webserver - Single Site Hosting Installer
 
-**Copyright:** Daniel Hiller  
+**Copyright:** Daniel Hiller
 **License:** AGPL-3 or later
 
-A fully automated, modular installer for production-ready webhosting environments on Debian 13 (Trixie).
+A fully automated installer for production-ready single-site web hosting environments. Optimized for Debian and Ubuntu LTS releases.
 
 ## 🚀 Features
 
-- **Multi-Version PHP Support**: Install PHP 5.6 to 8.4 in parallel
-- **Webserver Choice**: Nginx or Apache with optimized configuration
-- **Database**: MariaDB with automatic security hardening
+- **Single PHP Version**: Choose one PHP version (5.6 - 8.4) with easy switching
+- **Nginx Web Server**: High-performance, modern web server
+- **MariaDB Database**: Latest LTS version from official repository
 - **SSL/TLS**: Certbot for free Let's Encrypt certificates
+- **PHP Version Switcher**: Switch between PHP versions with one command
 - **Interactive Installation**: User-friendly dialog-based UI
 - **Production-Ready**: Optimized configurations and security hardening
-- **Modular**: Clear separation of components for easy maintenance
+- **Modern OS Support**: Debian 12/13 and Ubuntu 22.04/24.04 LTS
 
 ## 📋 Requirements
 
-- **Operating System**: Debian 13 (Trixie) - **ONLY Debian 13!**
+- **Operating System**:
+  - Debian 12 (Bookworm) or 13 (Trixie)
+  - Ubuntu 22.04 LTS (Jammy) or 24.04 LTS (Noble)
 - **Permissions**: Root privileges required
 - **Network**: Active internet connection
 - **Memory**: At least 1 GB RAM (2+ GB recommended)
@@ -73,8 +76,8 @@ The installer is **idempotent** - you can safely re-run it:
 The installer guides you through the following steps:
 
 1. **Welcome Screen** - Overview of the installer
-2. **Webserver Selection** - Nginx or Apache
-3. **PHP Versions** - Multiple selection from PHP 5.6 to 8.4
+2. **Web Server** - Nginx (optimized for single sites)
+3. **PHP Version** - Choose ONE PHP version (5.6 - 8.4)
 4. **MariaDB Configuration** - Optional with database/user creation
 5. **Certbot Installation** - Optional for SSL certificates
 6. **Summary** - Confirmation before installation
@@ -83,44 +86,40 @@ The installer guides you through the following steps:
 
 ## 📦 Installed Components
 
-### PHP-FPM (Multi-Version)
-
-After installation, all selected PHP versions are available in parallel:
-
-\`\`\`bash
-# PHP-FPM Sockets
-/run/php/php5.6-fpm.sock
-/run/php/php7.4-fpm.sock
-/run/php/php8.2-fpm.sock
-/run/php/php8.3-fpm.sock
-# ... additional installed versions
-\`\`\`
-
-**Installed PHP Extensions:**
-- mysql/mysqli, curl, gd, mbstring, xml, zip
-- intl, bcmath, imagick (if available), opcache
-
-### Nginx (if selected)
+### Nginx Web Server
 
 **Configuration:**
 - `/etc/nginx/nginx.conf`
-- `/etc/nginx/sites-available/`
+- `/etc/nginx/sites-available/default`
 - Webroot: `/var/www/html/`
 
 **Features:**
 - HTTP/2, Optimized SSL/TLS, Security Headers
 - Gzip Compression, Rate Limiting
-- PHP-FPM integration for all versions
+- PHP-FPM integration
+- Optimized for single-site hosting
 
-### Apache (if selected)
+### PHP-FPM (Single Version)
 
-**Configuration:**
-- `/etc/apache2/apache2.conf`
-- `/etc/apache2/sites-available/`
-- Webroot: `/var/www/html/`
+Your selected PHP version is installed with FPM:
 
-**Enabled Modules:**
-- mod_rewrite, mod_ssl, mod_headers, mod_proxy, mod_proxy_fcgi
+\`\`\`bash
+# PHP-FPM Socket (example for PHP 8.3)
+/run/php/php8.3-fpm.sock
+
+# Switch to a different version anytime:
+switch-php switch 8.4
+
+# Install a new version:
+switch-php install 7.4
+
+# Check current status:
+switch-php status
+\`\`\`
+
+**Installed PHP Extensions:**
+- mysql/mysqli, curl, gd, mbstring, xml, zip
+- intl, bcmath, imagick (if available), opcache
 
 ### MariaDB (if selected)
 

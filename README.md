@@ -47,9 +47,9 @@ pct set <CTID> -unprivileged 1 -features keyctl=1,nesting=1
 
 ### Quick Start
 
-\`\`\`bash
+```bash
 # Clone repository
-git clone https://github.com/yourusername/perfect-webserver.git
+git clone https://github.com/daniel-hiller/perfect-webserver.git
 cd perfect-webserver
 
 # Make installer executable
@@ -60,7 +60,7 @@ sudo ./install.sh
 
 # Optional: Override MariaDB version (default: 11.8)
 sudo MARIADB_VERSION=11.4 ./install.sh
-\`\`\`
+```
 
 ### Re-running the Installer
 
@@ -108,7 +108,7 @@ The installer guides you through the following steps:
 
 Your selected PHP version is installed with FPM:
 
-\`\`\`bash
+```bash
 # PHP-FPM Socket (example for PHP 8.3)
 /run/php/php8.3-fpm.sock
 
@@ -129,7 +129,7 @@ webserver-manager system security         # Run security check
 # Backups:
 webserver-manager backup setup            # Configure backups
 webserver-manager backup now              # Run backup now
-\`\`\`
+```
 
 **Installed PHP Extensions:**
 - mysql/mysqli, curl, gd, mbstring, xml, zip
@@ -175,69 +175,69 @@ webserver-manager backup now              # Run backup now
 
 ### Test Webserver
 
-\`\`\`bash
+```bash
 # Get IP address
 hostname -I
 
 # Open in browser: http://YOUR-SERVER-IP/
 # Test PHP: http://YOUR-SERVER-IP/info.php
-\`\`\`
+```
 
 ### Select PHP Version per Virtual Host
 
 **Nginx:**
-\`\`\`nginx
+```nginx
 location ~ \\.php$ {
     fastcgi_pass php83;  # php74, php82, php83, etc.
 }
-\`\`\`
+```
 
 **Apache:**
-\`\`\`apache
+```apache
 <FilesMatch \\.php$>
     SetHandler "proxy:unix:/run/php/php8.3-fpm.sock|fcgi://localhost"
 </FilesMatch>
-\`\`\`
+```
 
 ### Create Virtual Host
 
 **Nginx:**
-\`\`\`bash
+```bash
 sudo nano /etc/nginx/sites-available/example.com
 sudo ln -s /etc/nginx/sites-available/example.com /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
-\`\`\`
+```
 
 **Apache:**
-\`\`\`bash
+```bash
 sudo nano /etc/apache2/sites-available/example.com.conf
 sudo a2ensite example.com
 sudo apache2ctl configtest && sudo systemctl reload apache2
-\`\`\`
+```
 
 ### Setup SSL Certificate
 
-\`\`\`bash
+```bash
 # Nginx
 sudo certbot --nginx -d example.com -d www.example.com
 
 # Apache
 sudo certbot --apache -d example.com -d www.example.com
-\`\`\`
+```
 
 ### Manage MariaDB
 
-\`\`\`bash
+```bash
 sudo mysql
 CREATE DATABASE mydb CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER 'myuser'@'localhost' IDENTIFIED BY 'password';
 GRANT ALL PRIVILEGES ON mydb.* TO 'myuser'@'localhost';
 FLUSH PRIVILEGES;
-\`\`\`
+```
 
 ## 📂 Project Structure
 
-\`\`\`
+```
 perfect-webserver/
 ├── install.sh                    # Main installation script
 ├── lib/                          # Libraries
@@ -252,7 +252,7 @@ perfect-webserver/
 │   ├── apache-templates/
 │   └── php-templates/
 └── README.md                     # This file
-\`\`\`
+```
 
 ## 🛠️ Troubleshooting
 
@@ -263,51 +263,51 @@ perfect-webserver/
 The installer requires unprivileged LXC containers. To fix:
 
 1. Create a new unprivileged container:
-   \`\`\`bash
+   ```bash
    # On Proxmox host:
    pct set <CTID> -unprivileged 1 -features keyctl=1,nesting=1
-   \`\`\`
+   ```
 
 2. Verify container type inside the container:
-   \`\`\`bash
+   ```bash
    cat /proc/self/uid_map
    # "0 0 4294967295" = privileged (NOT supported)
    # "0 100000 65536" = unprivileged (required)
-   \`\`\`
+   ```
 
 **Locale warnings during installation:**
 - Automatically fixed by installer via \`setup_locale()\` function
 - Generates \`en_US.UTF-8\` locale for LXC containers
 
 ### PHP-FPM Issues
-\`\`\`bash
+```bash
 sudo systemctl status php8.3-fpm
 sudo journalctl -u php8.3-fpm -n 50
 sudo systemctl restart php8.3-fpm
-\`\`\`
+```
 
 ### Webserver Issues
-\`\`\`bash
+```bash
 # Nginx
 sudo nginx -t && sudo systemctl status nginx
 
 # Apache
 sudo apache2ctl configtest && sudo systemctl status apache2
-\`\`\`
+```
 
 ### MariaDB Issues
-\`\`\`bash
+```bash
 sudo systemctl status mariadb
 sudo journalctl -u mariadb -n 50
 sudo tail -f /var/log/mysql/error.log
-\`\`\`
+```
 
 ### Firewall
-\`\`\`bash
+```bash
 sudo ufw status
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
-\`\`\`
+```
 
 ## 🔒 Security Features
 
@@ -386,4 +386,4 @@ Developed by **Daniel Hiller**
 
 ---
 
-**Note:** Developed and tested exclusively for Debian 13 (Trixie).
+**Note:** Developed and tested exclusively for Debian 12/13 and Ubuntu 22.04/24.04 LTS.

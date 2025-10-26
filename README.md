@@ -11,9 +11,11 @@ A fully automated installer for production-ready single-site web hosting environ
 - **Nginx Web Server**: High-performance, modern web server
 - **MariaDB Database**: Latest LTS version from official repository
 - **SSL/TLS**: Certbot for free Let's Encrypt certificates
+- **Composer**: PHP dependency manager installed globally
 - **PHP Version Switcher**: Switch between PHP versions with one command
+- **Security Hardening**: Fail2ban, automatic updates, resource monitoring
 - **Interactive Installation**: User-friendly dialog-based UI
-- **Production-Ready**: Optimized configurations and security hardening
+- **Production-Ready**: Optimized configurations and security best practices
 - **Modern OS Support**: Debian 12/13 and Ubuntu 22.04/24.04 LTS
 
 ## 📋 Requirements
@@ -80,9 +82,12 @@ The installer guides you through the following steps:
 3. **PHP Version** - Choose ONE PHP version (5.6 - 8.4)
 4. **MariaDB Configuration** - Optional with database/user creation
 5. **Certbot Installation** - Optional for SSL certificates
-6. **Summary** - Confirmation before installation
-7. **Automatic Installation** - All components are installed
-8. **Completion** - Success confirmation with access details
+6. **Security Setup** - Fail2ban and automatic security updates
+7. **PHP Configuration** - php.ini settings (optional)
+8. **Backup Configuration** - Automatic backup schedule (optional)
+9. **Summary** - Confirmation before installation
+10. **Automatic Installation** - All components are installed
+11. **Completion** - Success confirmation with access details
 
 ## 📦 Installed Components
 
@@ -145,6 +150,26 @@ webserver-manager backup now              # Run backup now
 
 - Automatic renewal via Systemd timer
 - Easy certificate requests: `certbot --nginx -d example.com`
+
+### Security Features (if enabled)
+
+**Fail2ban:**
+- SSH protection: Auto-bans after 3 failed login attempts
+- Nginx protection: HTTP auth, bad bots, noscript, noproxy
+- Configuration: `/etc/fail2ban/jail.local`
+- Check status: `fail2ban-client status`
+
+**Unattended-Upgrades:**
+- Automatic security updates only (not all packages)
+- Daily checks for security patches
+- Configuration: `/etc/apt/apt.conf.d/50unattended-upgrades`
+- Automatic cleanup of old packages
+
+**System Resource Monitoring:**
+- SSH login displays: CPU, RAM, Disk usage
+- Service status: Nginx, PHP-FPM, MariaDB
+- Color-coded warnings for high resource usage
+- Security reminders and tips
 
 ## 📖 After Installation
 
@@ -299,20 +324,33 @@ sudo ufw allow 443/tcp
 ### Post-Installation Security
 
 1. **Run security check**: `webserver-manager system security`
-   - Checks for common security issues
-   - Provides fix recommendations
-2. **Remove info.php**: `sudo rm /var/www/html/info.php`
-3. **Regular updates**: `webserver-manager system update` (updates packages & Composer)
-4. **Configure firewall**: `sudo ufw enable` (pre-configured during install)
-5. **Secure SSH**: Edit `/etc/ssh/sshd_config`
-   - Disable root login: `PermitRootLogin no`
-   - Use key-based authentication
-6. **Install Fail2ban**: `sudo apt install fail2ban`
-7. **Enable automatic security updates**:
+   - Checks for common security issues (info.php, firewall, SSH, etc.)
+   - Provides actionable fix recommendations
+   - Run regularly to verify security posture
+
+2. **Remove test files**: `sudo rm /var/www/html/info.php`
+
+3. **Regular updates**: `webserver-manager system update`
+   - Updates all packages (apt upgrade)
+   - Updates Composer to latest version
+   - Recommended: Weekly or use automatic updates
+
+4. **Review Fail2ban status** (if installed):
    ```bash
-   sudo apt install unattended-upgrades
-   sudo dpkg-reconfigure -plow unattended-upgrades
+   fail2ban-client status          # Overview
+   fail2ban-client status sshd     # SSH jail details
+   fail2ban-client status nginx-*  # Nginx jails
    ```
+
+5. **Monitor system resources**:
+   - Automatic on SSH login (MOTD)
+   - Check logs: `/var/log/webhosting-installer/`
+   - Webserver logs: `/var/log/nginx/`
+
+6. **Review security configurations**:
+   - Firewall: `ufw status verbose`
+   - Nginx security: `/etc/nginx/sites-enabled/default`
+   - Fail2ban: `/etc/fail2ban/jail.local`
 
 ## 📚 Resources
 

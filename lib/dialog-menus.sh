@@ -260,6 +260,52 @@ Recommended: Yes" 18 65; then
 }
 
 # ============================================================================
+# SECURITY CONFIGURATION
+# ============================================================================
+
+# configure_fail2ban_menu: Ask if Fail2ban should be installed
+configure_fail2ban_menu() {
+    if dialog --title "Fail2ban Installation" \
+        --yesno "Do you want to install Fail2ban?\n\n\
+Fail2ban provides:\n\
+  • Automatic IP banning after failed login attempts\n\
+  • Protection against brute-force attacks\n\
+  • SSH, Nginx, and other service protection\n\
+  • Email notifications (optional)\n\n\
+Recommended for production servers: Yes\n\n\
+Install Fail2ban?" 17 65; then
+        INSTALL_FAIL2BAN="yes"
+        log "Fail2ban installation: yes"
+    else
+        INSTALL_FAIL2BAN="no"
+        log "Fail2ban installation: no"
+    fi
+
+    clear
+}
+
+# configure_unattended_upgrades_menu: Ask if Unattended-Upgrades should be installed
+configure_unattended_upgrades_menu() {
+    if dialog --title "Automatic Security Updates" \
+        --yesno "Do you want to enable automatic security updates?\n\n\
+Unattended-Upgrades provides:\n\
+  • Automatic security updates\n\
+  • No manual intervention required\n\
+  • Only installs security patches (not all updates)\n\
+  • Can be configured later\n\n\
+Recommended for production servers: Yes\n\n\
+Enable automatic security updates?" 17 65; then
+        INSTALL_UNATTENDED_UPGRADES="yes"
+        log "Unattended-Upgrades installation: yes"
+    else
+        INSTALL_UNATTENDED_UPGRADES="no"
+        log "Unattended-Upgrades installation: no"
+    fi
+
+    clear
+}
+
+# ============================================================================
 # PHP CONFIGURATION
 # ============================================================================
 
@@ -392,6 +438,12 @@ show_summary() {
 
     # Certbot
     summary_text+="Certbot/SSL:     ${INSTALL_CERTBOT}\n\n"
+
+    # Security
+    summary_text+="Security:\n"
+    summary_text+="  Fail2ban:      ${INSTALL_FAIL2BAN}\n"
+    summary_text+="  Auto-Updates:  ${INSTALL_UNATTENDED_UPGRADES}\n"
+    summary_text+="  MOTD Monitor:  yes\n\n"
 
     summary_text+="===============================================\n\n"
     summary_text+="Proceed with installation?"

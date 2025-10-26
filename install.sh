@@ -38,6 +38,7 @@ source "${LIB_DIR}/webserver-installer.sh"
 source "${LIB_DIR}/backup-installer.sh"
 source "${LIB_DIR}/database-installer.sh"
 source "${LIB_DIR}/certbot-installer.sh"
+source "${LIB_DIR}/security-installer.sh"
 
 # ============================================================================
 # GLOBAL VARIABLES
@@ -61,6 +62,10 @@ DB_HOST="localhost"
 
 # Certbot configuration
 INSTALL_CERTBOT=""
+
+# Security configuration
+INSTALL_FAIL2BAN=""
+INSTALL_UNATTENDED_UPGRADES=""
 
 # System information
 DEBIAN_VERSION=""
@@ -142,6 +147,10 @@ interactive_configuration() {
 
     # Configure Certbot
     configure_certbot_menu
+
+    # Configure Security (Fail2ban, Unattended-Upgrades)
+    configure_fail2ban_menu
+    configure_unattended_upgrades_menu
 
     # Configure PHP settings
     configure_php_settings
@@ -243,19 +252,25 @@ execute_installation() {
         log "Certbot installation skipped"
     fi
 
-    # Phase 5: Firewall Configuration
-    log "Phase 5: Firewall Configuration"
+    # Phase 5: Security Installation
+    log "Phase 5: Security Installation"
+    install_fail2ban
+    install_unattended_upgrades
+    install_resource_monitoring
+
+    # Phase 6: Firewall Configuration
+    log "Phase 6: Firewall Configuration"
     configure_firewall
 
-    # Phase 6: Backup Configuration
+    # Phase 7: Backup Configuration
     if [[ "${CONFIGURE_BACKUP}" == "yes" ]]; then
-        log "Phase 6: Backup Configuration"
+        log "Phase 7: Backup Configuration"
         setup_automatic_backups
     fi
 
-    # Phase 7: Webserver Configuration Test
+    # Phase 8: Webserver Configuration Test
     if [[ -n "${WEBSERVER}" ]]; then
-        log "Phase 7: Webserver Configuration Test"
+        log "Phase 8: Webserver Configuration Test"
         test_webserver_config
     fi
 
@@ -374,6 +389,12 @@ EOF
     cat >> "${report_file}" << EOF
 
 Certbot/SSL: ${INSTALL_CERTBOT:-no}
+
+Security:
+  - Fail2ban: ${INSTALL_FAIL2BAN:-no}
+  - Unattended-Upgrades: ${INSTALL_UNATTENDED_UPGRADES:-no}
+  - Resource Monitoring: yes (SSH login)
+  - Security Check: webserver-manager system security
 
 -----------------------------------------------------------------
 NEXT STEPS

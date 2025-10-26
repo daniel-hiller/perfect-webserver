@@ -452,37 +452,52 @@ install_composer() {
 
         # Update to latest version
         log "Updating Composer to latest version..."
-        composer self-update || log "Warning: Failed to update Composer"
+        COMPOSER_ALLOW_SUPERUSER=1 composer self-update || log "Warning: Failed to update Composer"
         return 0
     fi
 
-    # Download installer
+    # Method based on official Composer documentation
+    # https://getcomposer.org/doc/faqs/how-to-install-composer-programmatically.md
+
     log "Downloading Composer installer..."
+
+    # Get expected checksum
     local expected_checksum
-    expected_checksum=$(wget -q -O - https://composer.github.io/installer.sig)
+    expected_checksum=$(php -r 'copy("https://composer.github.io/installer.sig", "php://stdout");')
 
-    wget -q -O /tmp/composer-setup.php https://getcomposer.org/installer
+    # Download installer
+    php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php');"
 
-    # Verify installer
+    # Verify checksum
     local actual_checksum
-    actual_checksum=$(sha384sum /tmp/composer-setup.php | awk '{print $1}')
+    actual_checksum=$(php -r "echo hash_file('sha384', '/tmp/composer-setup.php');")
 
     if [[ "${expected_checksum}" != "${actual_checksum}" ]]; then
+        log "ERROR: Invalid Composer installer checksum"
+        log "Expected: ${expected_checksum}"
+        log "Actual:   ${actual_checksum}"
         rm -f /tmp/composer-setup.php
-        log "Warning: Composer installer verification failed, using direct download..."
-        # Fallback: direct download of composer.phar
+
+        # Fallback: Direct download of composer.phar
+        log "Falling back to direct download..."
         wget -q -O /usr/local/bin/composer https://getcomposer.org/download/latest-stable/composer.phar
         chmod +x /usr/local/bin/composer
     else
         # Install Composer
         log "Installing Composer globally..."
-        php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer --quiet
+        COMPOSER_ALLOW_SUPERUSER=1 php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
+        local result=$?
         rm -f /tmp/composer-setup.php
+
+        if [[ $result -ne 0 ]]; then
+            log "Warning: Composer installer returned error code ${result}"
+            return 1
+        fi
     fi
 
     # Verify installation
     if ! command -v composer &> /dev/null; then
-        log "Warning: Composer installation may have failed"
+        log "ERROR: Composer installation failed"
         return 1
     fi
 
@@ -490,11 +505,8 @@ install_composer() {
     chmod +x /usr/local/bin/composer
 
     local installed_version
-    installed_version=$(composer --version 2>/dev/null | grep -oP 'Composer version \K[0-9.]+' || echo "unknown")
+    installed_version=$(COMPOSER_ALLOW_SUPERUSER=1 composer --version 2>/dev/null | grep -oP 'Composer version \K[0-9.]+' || echo "unknown")
     log "Composer installed successfully (version: ${installed_version})"
-
-    # Disable interaction for root user
-    export COMPOSER_ALLOW_SUPERUSER=1
 
     log "Composer installation completed"
 }

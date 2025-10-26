@@ -117,8 +117,11 @@ webserver-manager php config              # Configure php.ini
 webserver-manager db create               # Create database/user
 webserver-manager db list                 # List databases
 
-# System & Backups:
-webserver-manager system update           # Update system
+# System & Security:
+webserver-manager system update           # Update system & Composer
+webserver-manager system security         # Run security check
+
+# Backups:
 webserver-manager backup setup            # Configure backups
 webserver-manager backup now              # Run backup now
 \`\`\`
@@ -126,6 +129,11 @@ webserver-manager backup now              # Run backup now
 **Installed PHP Extensions:**
 - mysql/mysqli, curl, gd, mbstring, xml, zip
 - intl, bcmath, imagick (if available), opcache
+
+**Composer (Dependency Manager):**
+- Installed globally: `/usr/local/bin/composer`
+- Usage: `composer install`, `composer require vendor/package`
+- Auto-updated to latest stable version
 
 ### MariaDB (if selected)
 
@@ -276,13 +284,35 @@ sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 \`\`\`
 
-## 🔒 Security Notes
+## 🔒 Security Features
 
-1. **Remove info.php**: `sudo rm /var/www/html/info.php`
-2. **Regular updates**: `sudo apt update && sudo apt upgrade`
-3. **Configure firewall**: `sudo ufw enable`
-4. **Secure SSH**: Edit `/etc/ssh/sshd_config`
-5. **Install Fail2ban**: `sudo apt install fail2ban`
+### Built-in Security
+- ✅ `.git` directory access blocked (prevents source code exposure)
+- ✅ Environment files (`.env`) blocked
+- ✅ Configuration files (`.yml`, `.ini`, `.conf`) blocked
+- ✅ Package manager files (`composer.json`, `package.json`) blocked
+- ✅ Version control files blocked
+- ✅ Security headers enabled (X-Frame-Options, X-Content-Type-Options, etc.)
+- ✅ Server tokens disabled (hides Nginx version)
+- ✅ Rate limiting configured
+
+### Post-Installation Security
+
+1. **Run security check**: `webserver-manager system security`
+   - Checks for common security issues
+   - Provides fix recommendations
+2. **Remove info.php**: `sudo rm /var/www/html/info.php`
+3. **Regular updates**: `webserver-manager system update` (updates packages & Composer)
+4. **Configure firewall**: `sudo ufw enable` (pre-configured during install)
+5. **Secure SSH**: Edit `/etc/ssh/sshd_config`
+   - Disable root login: `PermitRootLogin no`
+   - Use key-based authentication
+6. **Install Fail2ban**: `sudo apt install fail2ban`
+7. **Enable automatic security updates**:
+   ```bash
+   sudo apt install unattended-upgrades
+   sudo dpkg-reconfigure -plow unattended-upgrades
+   ```
 
 ## 📚 Resources
 

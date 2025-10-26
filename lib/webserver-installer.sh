@@ -210,7 +210,13 @@ server {
         fastcgi_pass ${default_upstream};
     }
 
-    # Deny access to hidden files
+    # Deny access to .git directories (security)
+    location ~ /\.git {
+        deny all;
+        return 404;
+    }
+
+    # Deny access to other hidden files
     location ~ /\. {
         deny all;
         access_log off;
@@ -222,6 +228,17 @@ server {
         deny all;
         access_log off;
         log_not_found off;
+    }
+
+    # Deny access to version control files
+    location ~* \.(git|svn|hg)$ {
+        deny all;
+        return 404;
+    }
+
+    # Deny access to sensitive files
+    location ~* \.(env|log|sql)$ {
+        deny all;
     }
 }
 EOF

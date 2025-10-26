@@ -190,6 +190,9 @@ execute_installation() {
             apply_custom_php_settings "${version}"
         done
 
+        # Install Composer
+        install_composer
+
         log "PHP installation completed"
     else
         log "No PHP versions selected, skipping PHP installation"
@@ -326,6 +329,15 @@ EOF
             echo "  - PHP ${version} (FPM socket: /run/php/php${version}-fpm.sock)" >> "${report_file}"
         done
         echo "" >> "${report_file}"
+
+        # Composer info
+        if command -v composer &> /dev/null; then
+            local composer_version
+            composer_version=$(composer --version 2>/dev/null | grep -oP 'Composer version \K[0-9.]+' || echo "installed")
+            echo "  Composer: ${composer_version}" >> "${report_file}"
+            echo "  Usage: composer install, composer require <package>" >> "${report_file}"
+        fi
+
         echo "" >> "${report_file}"
         echo "  Management Tool: webserver-manager" >> "${report_file}"
         echo "  - Switch PHP: webserver-manager php switch <version>" >> "${report_file}"

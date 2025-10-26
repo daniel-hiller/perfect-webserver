@@ -437,6 +437,69 @@ install_additional_php_extension() {
 }
 
 # ============================================================================
+# COMPOSER INSTALLATION
+# ============================================================================
+
+# install_composer: Install Composer globally
+install_composer() {
+    log "Installing Composer (PHP dependency manager)..."
+
+    # Check if already installed
+    if command -v composer &> /dev/null; then
+        local current_version
+        current_version=$(composer --version 2>/dev/null | grep -oP 'Composer version \K[0-9.]+' || echo "unknown")
+        log "Composer is already installed (version: ${current_version})"
+
+        # Update to latest version
+        log "Updating Composer to latest version..."
+        composer self-update || log "Warning: Failed to update Composer"
+        return 0
+    fi
+
+    # Download installer
+    log "Downloading Composer installer..."
+    local expected_checksum
+    expected_checksum=$(wget -q -O - https://composer.github.io/installer.sig)
+
+    wget -q -O /tmp/composer-setup.php https://getcomposer.org/installer
+
+    # Verify installer
+    local actual_checksum
+    actual_checksum=$(sha384sum /tmp/composer-setup.php | awk '{print $1}')
+
+    if [[ "${expected_checksum}" != "${actual_checksum}" ]]; then
+        rm -f /tmp/composer-setup.php
+        log "Warning: Composer installer verification failed, using direct download..."
+        # Fallback: direct download of composer.phar
+        wget -q -O /usr/local/bin/composer https://getcomposer.org/download/latest-stable/composer.phar
+        chmod +x /usr/local/bin/composer
+    else
+        # Install Composer
+        log "Installing Composer globally..."
+        php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer --quiet
+        rm -f /tmp/composer-setup.php
+    fi
+
+    # Verify installation
+    if ! command -v composer &> /dev/null; then
+        log "Warning: Composer installation may have failed"
+        return 1
+    fi
+
+    # Set permissions
+    chmod +x /usr/local/bin/composer
+
+    local installed_version
+    installed_version=$(composer --version 2>/dev/null | grep -oP 'Composer version \K[0-9.]+' || echo "unknown")
+    log "Composer installed successfully (version: ${installed_version})"
+
+    # Disable interaction for root user
+    export COMPOSER_ALLOW_SUPERUSER=1
+
+    log "Composer installation completed"
+}
+
+# ============================================================================
 # END OF PHP INSTALLER
 # ============================================================================
 

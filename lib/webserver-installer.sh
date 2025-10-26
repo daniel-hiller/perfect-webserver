@@ -287,18 +287,18 @@ install_error_pages() {
     log "Installing custom error pages..."
 
     local error_dir="/var/www/errors"
-    local template_dir="${SCRIPT_DIR}/../config/templates"
+    local template_dir="${CONFIG_DIR}/templates"
 
     # Create error pages directory
     mkdir -p "${error_dir}"
 
     # Copy error page templates
     local error_files=("403" "404" "500" "502" "503")
-    
+
     for error_code in "${error_files[@]}"; do
         local template_file="${template_dir}/error-${error_code}.html"
         local dest_file="${error_dir}/${error_code}.html"
-        
+
         if [[ -f "${template_file}" ]]; then
             cp "${template_file}" "${dest_file}"
             log "Installed error page: ${error_code}.html"
@@ -313,12 +313,15 @@ install_error_pages() {
         log "Created generic 50x.html error page"
     fi
 
-    # Set permissions
-    chown -R www-data:www-data "${error_dir}"
-    chmod 755 "${error_dir}"
-    chmod 644 "${error_dir}"/*.html
-
-    log "Custom error pages installed in ${error_dir}"
+    # Set permissions (only if files exist)
+    if ls "${error_dir}"/*.html &> /dev/null; then
+        chown -R www-data:www-data "${error_dir}"
+        chmod 755 "${error_dir}"
+        chmod 644 "${error_dir}"/*.html
+        log "Custom error pages installed in ${error_dir}"
+    else
+        log "Warning: No error pages were installed"
+    fi
 }
 
 # ============================================================================

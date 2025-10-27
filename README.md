@@ -184,45 +184,24 @@ hostname -I
 ```
 
 ### Select PHP Version per Virtual Host
-
-**Nginx:**
 ```nginx
 location ~ \\.php$ {
     fastcgi_pass php83;  # php74, php82, php83, etc.
 }
 ```
 
-**Apache:**
-```apache
-<FilesMatch \\.php$>
-    SetHandler "proxy:unix:/run/php/php8.3-fpm.sock|fcgi://localhost"
-</FilesMatch>
-```
-
 ### Create Virtual Host
 
-**Nginx:**
 ```bash
 sudo nano /etc/nginx/sites-available/example.com
 sudo ln -s /etc/nginx/sites-available/example.com /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-**Apache:**
-```bash
-sudo nano /etc/apache2/sites-available/example.com.conf
-sudo a2ensite example.com
-sudo apache2ctl configtest && sudo systemctl reload apache2
-```
-
 ### Setup SSL Certificate
 
 ```bash
-# Nginx
 sudo certbot --nginx -d example.com -d www.example.com
-
-# Apache
-sudo certbot --apache -d example.com -d www.example.com
 ```
 
 ### Manage MariaDB
@@ -244,12 +223,11 @@ perfect-webserver/
 │   ├── utils.sh                  # Utility functions
 │   ├── dialog-menus.sh           # UI/Dialog menus
 │   ├── php-installer.sh          # PHP installation
-│   ├── webserver-installer.sh    # Nginx/Apache installation
+│   ├── webserver-installer.sh    # Nginx installation
 │   ├── database-installer.sh     # MariaDB installation
 │   └── certbot-installer.sh      # SSL/Certbot installation
 ├── config/                       # Configuration templates
 │   ├── nginx-templates/
-│   ├── apache-templates/
 │   └── php-templates/
 └── README.md                     # This file
 ```
@@ -288,11 +266,7 @@ sudo systemctl restart php8.3-fpm
 
 ### Webserver Issues
 ```bash
-# Nginx
 sudo nginx -t && sudo systemctl status nginx
-
-# Apache
-sudo apache2ctl configtest && sudo systemctl status apache2
 ```
 
 ### MariaDB Issues
@@ -355,7 +329,6 @@ sudo ufw allow 443/tcp
 ## 📚 Resources
 
 - [Nginx Documentation](https://nginx.org/en/docs/)
-- [Apache Documentation](https://httpd.apache.org/docs/)
 - [PHP Documentation](https://www.php.net/docs.php)
 - [MariaDB Documentation](https://mariadb.com/kb/en/)
 - [Certbot Documentation](https://certbot.eff.org/docs/)

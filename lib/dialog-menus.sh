@@ -13,12 +13,12 @@
 
 # show_welcome: Display welcome message and introduction
 show_welcome() {
-    dialog --title "Webhosting Installer" \
-        --msgbox "Welcome to the Webhosting VM/LXC Installer!\n\n\
+    dialog --title "Perfect Webserver Installer" \
+        --msgbox "Welcome to the Perfect Webserver VM/LXC Installer!\n\n\
 This installer automatically sets up a complete\n\
-webhosting environment on Debian 13:\n\n\
+webhosting environment on Debian 12/13 and Ubuntu 22.04/24.04:\n\n\
   • PHP 5.6 to 8.4 (Multi-Version Support)\n\
-  • Nginx or Apache Webserver\n\
+  • Nginx Webserver\n\
   • MariaDB Database (optional)\n\
   • Certbot/Let's Encrypt SSL (optional)\n\n\
 The installation is interactive.\n\

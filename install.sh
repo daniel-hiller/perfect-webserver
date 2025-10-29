@@ -127,6 +127,12 @@ pre_flight_checks() {
         apt-get install -y -qq dialog || error_exit "Failed to install dialog"
     fi
 
+    # Install essential tools if missing
+    log "Installing essential system tools..."
+    local essential_tools="curl git sudo wget ca-certificates gnupg lsb-release"
+    apt-get install -y -qq ${essential_tools} || error_exit "Failed to install essential tools"
+    log "Essential tools installed: ${essential_tools}"
+
     log "Pre-flight checks completed successfully"
 }
 

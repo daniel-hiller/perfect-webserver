@@ -34,6 +34,7 @@ fi
 source "${LIB_DIR}/utils.sh"
 source "${LIB_DIR}/dialog-menus.sh"
 source "${LIB_DIR}/php-installer.sh"
+source "${LIB_DIR}/nodejs-installer.sh"
 source "${LIB_DIR}/webserver-installer.sh"
 source "${LIB_DIR}/backup-installer.sh"
 source "${LIB_DIR}/database-installer.sh"
@@ -50,6 +51,9 @@ WEBSERVER=""
 # PHP configuration
 declare -a PHP_VERSIONS=()
 SURY_REPO_ADDED=false
+
+# Node.js configuration
+NODEJS_VERSION=""
 
 # MariaDB configuration
 INSTALL_MARIADB=""
@@ -142,6 +146,9 @@ interactive_configuration() {
     # Select PHP version (single version)
     select_php_version
 
+    # Configure Node.js
+    configure_nodejs_menu
+
     # Configure MariaDB
     configure_mariadb_menu
 
@@ -207,9 +214,18 @@ execute_installation() {
         log "No PHP versions selected, skipping PHP installation"
     fi
 
-    # Phase 2: Webserver Installation
+    # Phase 2: Node.js Installation
+    if [[ -n "${NODEJS_VERSION}" ]] && [[ "${NODEJS_VERSION}" != "no" ]]; then
+        log "Phase 2: Node.js Installation"
+        install_nodejs
+        log "Node.js installation completed"
+    else
+        log "Node.js installation skipped"
+    fi
+
+    # Phase 3: Webserver Installation
     if [[ -n "${WEBSERVER}" ]]; then
-        log "Phase 2: Webserver Installation"
+        log "Phase 3: Webserver Installation"
 
         if [[ "${WEBSERVER}" == "nginx" ]]; then
             install_nginx
@@ -222,9 +238,9 @@ execute_installation() {
         log "No webserver selected, skipping webserver installation"
     fi
 
-    # Phase 3: MariaDB Installation
+    # Phase 4: MariaDB Installation
     if [[ "${INSTALL_MARIADB}" == "yes" ]]; then
-        log "Phase 3: MariaDB Installation"
+        log "Phase 4: MariaDB Installation"
 
         install_mariadb
         secure_mariadb
@@ -240,9 +256,9 @@ execute_installation() {
         log "MariaDB installation skipped"
     fi
 
-    # Phase 4: Certbot Installation
+    # Phase 5: Certbot Installation
     if [[ "${INSTALL_CERTBOT}" == "yes" ]]; then
-        log "Phase 4: Certbot Installation"
+        log "Phase 5: Certbot Installation"
 
         install_certbot
         install_certbot_plugin
@@ -252,25 +268,25 @@ execute_installation() {
         log "Certbot installation skipped"
     fi
 
-    # Phase 5: Security Installation
-    log "Phase 5: Security Installation"
+    # Phase 6: Security Installation
+    log "Phase 6: Security Installation"
     install_fail2ban
     install_unattended_upgrades
     install_resource_monitoring
 
-    # Phase 6: Firewall Configuration
-    log "Phase 6: Firewall Configuration"
+    # Phase 7: Firewall Configuration
+    log "Phase 7: Firewall Configuration"
     configure_firewall
 
-    # Phase 7: Backup Configuration
+    # Phase 8: Backup Configuration
     if [[ "${CONFIGURE_BACKUP}" == "yes" ]]; then
-        log "Phase 7: Backup Configuration"
+        log "Phase 8: Backup Configuration"
         setup_automatic_backups
     fi
 
-    # Phase 8: Webserver Configuration Test
+    # Phase 9: Webserver Configuration Test
     if [[ -n "${WEBSERVER}" ]]; then
-        log "Phase 8: Webserver Configuration Test"
+        log "Phase 9: Webserver Configuration Test"
         test_webserver_config
     fi
 
@@ -361,6 +377,28 @@ EOF
         echo "  - Setup Backups: webserver-manager backup setup" >> "${report_file}"
     else
         echo "  - None" >> "${report_file}"
+    fi
+
+    cat >> "${report_file}" << EOF
+
+Node.js:
+EOF
+
+    if [[ -n "${NODEJS_VERSION}" ]] && [[ "${NODEJS_VERSION}" != "no" ]]; then
+        if command -v node &> /dev/null; then
+            local node_version npm_version
+            node_version=$(node -v)
+            npm_version=$(npm -v)
+            cat >> "${report_file}" << EOF
+  - Version: ${node_version}
+  - npm: ${npm_version}
+  - Usage: node script.js, npm install <package>
+EOF
+        else
+            echo "  - v${NODEJS_VERSION} (installation attempted)" >> "${report_file}"
+        fi
+    else
+        echo "  - Not installed" >> "${report_file}"
     fi
 
     cat >> "${report_file}" << EOF

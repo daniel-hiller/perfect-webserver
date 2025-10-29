@@ -18,12 +18,13 @@ show_welcome() {
 This installer automatically sets up a complete\n\
 webhosting environment on Debian 12/13 and Ubuntu 22.04/24.04:\n\n\
   • PHP 5.6 to 8.4 (Multi-Version Support)\n\
+  • Node.js LTS (v20, v22, v24, v25) (optional)\n\
   • Nginx Webserver\n\
   • MariaDB Database (optional)\n\
   • Certbot/Let's Encrypt SSL (optional)\n\n\
 The installation is interactive.\n\
 Press OK to continue." \
-        20 70
+        22 70
     clear
 }
 
@@ -72,6 +73,38 @@ select_php_version() {
 
     PHP_VERSIONS=("${choice}")
     log "PHP version selected: ${choice}"
+
+    clear
+}
+
+# ============================================================================
+# NODEJS CONFIGURATION
+# ============================================================================
+
+# configure_nodejs_menu: Ask if Node.js should be installed
+configure_nodejs_menu() {
+    local choice
+
+    choice=$(dialog --stdout --title "Node.js Installation" \
+        --menu "Do you want to install Node.js?\n\nNode.js is useful for:\n  • Modern JavaScript applications\n  • Build tools (Webpack, Vite, etc.)\n  • Package managers (npm, yarn)\n  • Development tools\n\nSelect version or skip:" \
+        20 70 6 \
+        "no" "Skip Node.js installation" \
+        "25" "Node.js v25 (Current - Latest)" \
+        "24" "Node.js v24 LTS Krypton (Recommended)" \
+        "22" "Node.js v22 LTS Jod" \
+        "20" "Node.js v20 LTS Iron")
+
+    if [[ -z "${choice}" ]]; then
+        choice="no"
+    fi
+
+    NODEJS_VERSION="${choice}"
+
+    if [[ "${NODEJS_VERSION}" == "no" ]]; then
+        log "Node.js installation: no"
+    else
+        log "Node.js installation: yes (version ${NODEJS_VERSION})"
+    fi
 
     clear
 }
@@ -424,6 +457,13 @@ show_summary() {
     fi
     summary_text+="\n"
 
+    # Node.js
+    if [[ -n "${NODEJS_VERSION}" ]] && [[ "${NODEJS_VERSION}" != "no" ]]; then
+        summary_text+="Node.js:         v${NODEJS_VERSION}\n\n"
+    else
+        summary_text+="Node.js:         no\n\n"
+    fi
+
     # MariaDB
     summary_text+="MariaDB:         ${INSTALL_MARIADB}\n"
     if [[ "${INSTALL_MARIADB}" == "yes" ]]; then
@@ -487,6 +527,12 @@ show_completion() {
         completion_text+="FPM Sockets:     /run/php/php*-fpm.sock\n\n"
     fi
 
+    # Node.js info
+    if [[ -n "${NODEJS_VERSION}" ]] && [[ "${NODEJS_VERSION}" != "no" ]]; then
+        completion_text+="Node.js:         $(node -v 2>/dev/null || echo "v${NODEJS_VERSION}")\n"
+        completion_text+="npm:             $(npm -v 2>/dev/null || echo "installed")\n\n"
+    fi
+
     # MariaDB info
     if [[ "${INSTALL_MARIADB}" == "yes" ]]; then
         completion_text+="MariaDB:         localhost:3306\n"
@@ -524,6 +570,9 @@ show_completion() {
     fi
     if [[ ${#PHP_VERSIONS[@]} -gt 0 ]]; then
         echo "PHP:         ${PHP_VERSIONS[*]}"
+    fi
+    if [[ -n "${NODEJS_VERSION}" ]] && [[ "${NODEJS_VERSION}" != "no" ]]; then
+        echo "Node.js:     $(node -v 2>/dev/null || echo "v${NODEJS_VERSION}")"
     fi
     if [[ "${INSTALL_MARIADB}" == "yes" ]]; then
         echo "MariaDB:     localhost:3306"

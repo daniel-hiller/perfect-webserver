@@ -8,10 +8,12 @@ A fully automated installer for production-ready single-site web hosting environ
 ## 🚀 Features
 
 - **Single PHP Version**: Choose one PHP version (5.6 - 8.4) with easy switching
+- **Node.js Support**: Optional Node.js LTS versions (v20, v22, v24, v25)
 - **Nginx Web Server**: High-performance, modern web server
 - **MariaDB Database**: Latest LTS version from official repository
 - **SSL/TLS**: Certbot for free Let's Encrypt certificates
 - **Composer**: PHP dependency manager installed globally
+- **npm/Node.js**: JavaScript runtime and package manager (optional)
 - **PHP Version Switcher**: Switch between PHP versions with one command
 - **Security Hardening**: Fail2ban, automatic updates, resource monitoring
 - **Interactive Installation**: User-friendly dialog-based UI
@@ -80,14 +82,15 @@ The installer guides you through the following steps:
 1. **Welcome Screen** - Overview of the installer
 2. **Web Server** - Nginx (optimized for single sites)
 3. **PHP Version** - Choose ONE PHP version (5.6 - 8.4)
-4. **MariaDB Configuration** - Optional with database/user creation
-5. **Certbot Installation** - Optional for SSL certificates
-6. **Security Setup** - Fail2ban and automatic security updates
-7. **PHP Configuration** - php.ini settings (optional)
-8. **Backup Configuration** - Automatic backup schedule (optional)
-9. **Summary** - Confirmation before installation
-10. **Automatic Installation** - All components are installed
-11. **Completion** - Success confirmation with access details
+4. **Node.js Version** - Optional Node.js (v20, v22, v24, v25)
+5. **MariaDB Configuration** - Optional with database/user creation
+6. **Certbot Installation** - Optional for SSL certificates
+7. **Security Setup** - Fail2ban and automatic security updates
+8. **PHP Configuration** - php.ini settings (optional)
+9. **Backup Configuration** - Automatic backup schedule (optional)
+10. **Summary** - Confirmation before installation
+11. **Automatic Installation** - All components are installed
+12. **Completion** - Success confirmation with access details
 
 ## 📦 Installed Components
 
@@ -139,6 +142,26 @@ webserver-manager backup now              # Run backup now
 - Installed globally: `/usr/local/bin/composer`
 - Usage: `composer install`, `composer require vendor/package`
 - Auto-updated to latest stable version
+
+### Node.js (if selected)
+
+**Available Versions:**
+- Node.js v25 (Current - Latest)
+- Node.js v24 LTS "Krypton" (Recommended)
+- Node.js v22 LTS "Jod"
+- Node.js v20 LTS "Iron"
+
+**Installation Method:**
+- Official NodeSource repository
+- Latest npm automatically updated after installation
+- Usage: `node script.js`, `npm install package`
+
+**Installed via:**
+```bash
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo bash -
+sudo apt-get install -y nodejs
+npm install -g npm  # Auto-updated during installation
+```
 
 ### MariaDB (if selected)
 
@@ -223,9 +246,12 @@ perfect-webserver/
 │   ├── utils.sh                  # Utility functions
 │   ├── dialog-menus.sh           # UI/Dialog menus
 │   ├── php-installer.sh          # PHP installation
+│   ├── nodejs-installer.sh       # Node.js installation
 │   ├── webserver-installer.sh    # Nginx installation
 │   ├── database-installer.sh     # MariaDB installation
-│   └── certbot-installer.sh      # SSL/Certbot installation
+│   ├── certbot-installer.sh      # SSL/Certbot installation
+│   ├── security-installer.sh     # Security setup
+│   └── backup-installer.sh       # Backup configuration
 ├── config/                       # Configuration templates
 │   ├── nginx-templates/
 │   └── php-templates/
@@ -267,6 +293,13 @@ sudo systemctl restart php8.3-fpm
 ### Webserver Issues
 ```bash
 sudo nginx -t && sudo systemctl status nginx
+```
+
+### Node.js Issues
+```bash
+node -v && npm -v
+npm config list
+npm cache clean --force
 ```
 
 ### MariaDB Issues
